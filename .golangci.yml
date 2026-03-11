@@ -1,0 +1,39 @@
+version: "2"
+
+linters:
+  enable:
+    - errcheck
+    - govet
+    - staticcheck
+    - errorlint
+    - gocritic
+    - revive
+    - exhaustive
+    - gocyclo
+    - funlen
+
+linters-settings:
+  gocyclo:
+    min-complexity: 15
+  funlen:
+    lines: 80
+    statements: 50
+  exhaustive:
+    default-signifies-exhaustive: true
+
+formatters:
+  enable:
+    - gofmt
+    - goimports
+
+formatters-settings:
+  goimports:
+    local-prefixes:
+      - github.com/johlun99/merchant-analyzer
+
+issues:
+  exclude-rules:
+    - path: _test\.go
+      linters:
+        - funlen
+        - gocritic
