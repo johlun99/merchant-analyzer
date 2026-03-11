@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0" xmlns:g="http://base.google.com/ns/1.0">
+  <channel>
+    <title>Minimal Test Feed</title>
+    <item>
+      <g:id>min-001</g:id>
+      <g:title>Minimal Product One</g:title>
+      <g:price>10.00 SEK</g:price>
+    </item>
+    <item>
+      <g:id>min-002</g:id>
+      <g:title>Minimal Product Two</g:title>
+      <g:price>20.00 SEK</g:price>
+    </item>
+    <item>
+      <g:id>min-003</g:id>
+      <g:title>Minimal Product Three</g:title>
+      <g:price>30.00 SEK</g:price>
+    </item>
+  </channel>
+</rss>

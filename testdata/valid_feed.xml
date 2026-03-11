@@ -1,0 +1,87 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0" xmlns:g="http://base.google.com/ns/1.0">
+  <channel>
+    <title>Valid Test Feed</title>
+    <link>https://example.com</link>
+    <item>
+      <g:id>prod-001</g:id>
+      <g:title>Blue Running Shoes</g:title>
+      <g:description>High-performance running shoes with cushioned sole and breathable mesh upper. Perfect for long-distance running on various terrains. Available in multiple colors.</g:description>
+      <g:price>89.99 SEK</g:price>
+      <g:availability>in stock</g:availability>
+      <g:link>https://example.com/products/prod-001</g:link>
+      <g:image_link>https://example.com/images/prod-001.jpg</g:image_link>
+      <g:brand>RunFast</g:brand>
+      <g:gtin>12345678901234</g:gtin>
+      <g:condition>new</g:condition>
+      <g:color>Blue</g:color>
+      <g:size>42</g:size>
+      <g:material>Mesh</g:material>
+      <g:additional_image_link>https://example.com/images/prod-001-side.jpg</g:additional_image_link>
+    </item>
+    <item>
+      <g:id>prod-002</g:id>
+      <g:title>Red Trail Boots</g:title>
+      <g:description>Durable trail boots with waterproof Gore-Tex membrane and Vibram outsole. Excellent ankle support for rugged terrain. Suitable for hiking and trekking adventures.</g:description>
+      <g:price>149.99 SEK</g:price>
+      <g:availability>in stock</g:availability>
+      <g:link>https://example.com/products/prod-002</g:link>
+      <g:image_link>https://example.com/images/prod-002.jpg</g:image_link>
+      <g:brand>TrailMaster</g:brand>
+      <g:gtin>12345678901235</g:gtin>
+      <g:condition>new</g:condition>
+      <g:color>Red</g:color>
+      <g:size>43</g:size>
+      <g:material>Gore-Tex</g:material>
+      <g:additional_image_link>https://example.com/images/prod-002-side.jpg</g:additional_image_link>
+    </item>
+    <item>
+      <g:id>prod-003</g:id>
+      <g:title>Green Yoga Mat</g:title>
+      <g:description>Eco-friendly yoga mat made from natural rubber. Non-slip surface with alignment lines. Ideal for all styles of yoga and pilates practice at home or in the studio.</g:description>
+      <g:price>39.99 SEK</g:price>
+      <g:availability>in stock</g:availability>
+      <g:link>https://example.com/products/prod-003</g:link>
+      <g:image_link>https://example.com/images/prod-003.jpg</g:image_link>
+      <g:brand>YogaLife</g:brand>
+      <g:gtin>12345678901236</g:gtin>
+      <g:condition>new</g:condition>
+      <g:color>Green</g:color>
+      <g:size>Standard</g:size>
+      <g:material>Natural Rubber</g:material>
+      <g:additional_image_link>https://example.com/images/prod-003-rolled.jpg</g:additional_image_link>
+    </item>
+    <item>
+      <g:id>prod-004</g:id>
+      <g:title>Black Cycling Helmet</g:title>
+      <g:description>Lightweight aerodynamic cycling helmet with 18 ventilation channels and adjustable retention system. Meets EN 1078 safety standard. Great for road and mountain biking.</g:description>
+      <g:price>79.99 SEK</g:price>
+      <g:availability>preorder</g:availability>
+      <g:link>https://example.com/products/prod-004</g:link>
+      <g:image_link>https://example.com/images/prod-004.jpg</g:image_link>
+      <g:brand>SafeRide</g:brand>
+      <g:gtin>12345678901237</g:gtin>
+      <g:condition>new</g:condition>
+      <g:color>Black</g:color>
+      <g:size>M</g:size>
+      <g:material>Polycarbonate</g:material>
+      <g:additional_image_link>https://example.com/images/prod-004-side.jpg</g:additional_image_link>
+    </item>
+    <item>
+      <g:id>prod-005</g:id>
+      <g:title>Orange Water Bottle</g:title>
+      <g:description>BPA-free stainless steel water bottle with double-wall vacuum insulation. Keeps drinks cold for 24 hours and hot for 12 hours. Leak-proof lid with carabiner clip.</g:description>
+      <g:price>24.99 SEK</g:price>
+      <g:availability>in stock</g:availability>
+      <g:link>https://example.com/products/prod-005</g:link>
+      <g:image_link>https://example.com/images/prod-005.jpg</g:image_link>
+      <g:brand>HydroGo</g:brand>
+      <g:gtin>12345678901238</g:gtin>
+      <g:condition>new</g:condition>
+      <g:color>Orange</g:color>
+      <g:size>750ml</g:size>
+      <g:material>Stainless Steel</g:material>
+      <g:additional_image_link>https://example.com/images/prod-005-open.jpg</g:additional_image_link>
+    </item>
+  </channel>
+</rss>

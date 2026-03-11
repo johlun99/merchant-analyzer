@@ -1,0 +1,87 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0" xmlns:g="http://base.google.com/ns/1.0">
+  <channel>
+    <title>AI Optimized Test Feed</title>
+    <link>https://example.com</link>
+    <item>
+      <g:id>ai-001</g:id>
+      <g:title>Premium Leather Wallet</g:title>
+      <g:description>Handcrafted full-grain leather bifold wallet with RFID blocking technology. Features 6 card slots, 2 bill compartments, and ID window. Slim profile fits comfortably in front pocket. Genuine Italian leather ages beautifully with use.</g:description>
+      <g:price>59.99 SEK</g:price>
+      <g:availability>in stock</g:availability>
+      <g:link>https://example.com/products/ai-001</g:link>
+      <g:image_link>https://example.com/images/ai-001.jpg</g:image_link>
+      <g:brand>LeatherCraft</g:brand>
+      <g:gtin>98765432101234</g:gtin>
+      <g:condition>new</g:condition>
+      <g:color>Brown</g:color>
+      <g:size>One Size</g:size>
+      <g:material>Full-Grain Leather</g:material>
+      <g:additional_image_link>https://example.com/images/ai-001-open.jpg</g:additional_image_link>
+    </item>
+    <item>
+      <g:id>ai-002</g:id>
+      <g:title>Merino Wool Scarf</g:title>
+      <g:description>Luxuriously soft merino wool scarf sourced from ethically raised sheep in New Zealand. 180cm length and 30cm width provides versatile styling options. Naturally temperature-regulating and moisture-wicking for year-round comfort. Hand-wash only.</g:description>
+      <g:price>44.99 SEK</g:price>
+      <g:availability>in stock</g:availability>
+      <g:link>https://example.com/products/ai-002</g:link>
+      <g:image_link>https://example.com/images/ai-002.jpg</g:image_link>
+      <g:brand>WoolWorks</g:brand>
+      <g:gtin>98765432101235</g:gtin>
+      <g:condition>new</g:condition>
+      <g:color>Charcoal Grey</g:color>
+      <g:size>One Size</g:size>
+      <g:material>Merino Wool</g:material>
+      <g:additional_image_link>https://example.com/images/ai-002-worn.jpg</g:additional_image_link>
+    </item>
+    <item>
+      <g:id>ai-003</g:id>
+      <g:title>Bamboo Cutting Board Set</g:title>
+      <g:description>Set of 3 premium bamboo cutting boards in small, medium, and large sizes. Naturally antimicrobial surface resists bacteria and odors. Juice grooves prevent mess. Harder than maple wood yet gentle on knife edges. Dishwasher safe and sustainably sourced.</g:description>
+      <g:price>34.99 SEK</g:price>
+      <g:availability>in stock</g:availability>
+      <g:link>https://example.com/products/ai-003</g:link>
+      <g:image_link>https://example.com/images/ai-003.jpg</g:image_link>
+      <g:brand>EcoKitchen</g:brand>
+      <g:gtin>98765432101236</g:gtin>
+      <g:condition>new</g:condition>
+      <g:color>Natural</g:color>
+      <g:size>Set of 3</g:size>
+      <g:material>Bamboo</g:material>
+      <g:additional_image_link>https://example.com/images/ai-003-detail.jpg</g:additional_image_link>
+    </item>
+    <item>
+      <g:id>ai-004</g:id>
+      <g:title>Titanium Sunglasses</g:title>
+      <g:description>Ultra-lightweight titanium frame sunglasses with polarized UV400 lenses. Weighing only 18 grams, they are ideal for outdoor activities. Scratch-resistant lenses reduce glare from water and roads. Includes hard case and cleaning cloth. Available prescription-ready.</g:description>
+      <g:price>129.99 SEK</g:price>
+      <g:availability>in stock</g:availability>
+      <g:link>https://example.com/products/ai-004</g:link>
+      <g:image_link>https://example.com/images/ai-004.jpg</g:image_link>
+      <g:brand>ClearVision</g:brand>
+      <g:gtin>98765432101237</g:gtin>
+      <g:condition>new</g:condition>
+      <g:color>Silver</g:color>
+      <g:size>Medium</g:size>
+      <g:material>Titanium</g:material>
+      <g:additional_image_link>https://example.com/images/ai-004-worn.jpg</g:additional_image_link>
+    </item>
+    <item>
+      <g:id>ai-005</g:id>
+      <g:title>Cedar Wood Soap Dish</g:title>
+      <g:description>Handcarved aromatic cedar wood soap dish with slatted design that allows water to drain and soap to dry between uses. Cedar naturally repels mold and mildew. Subtle natural fragrance. Fits standard bar soaps. Sustainably harvested from certified forests in Scandinavia.</g:description>
+      <g:price>14.99 SEK</g:price>
+      <g:availability>in stock</g:availability>
+      <g:link>https://example.com/products/ai-005</g:link>
+      <g:image_link>https://example.com/images/ai-005.jpg</g:image_link>
+      <g:brand>NordicCraft</g:brand>
+      <g:gtin>98765432101238</g:gtin>
+      <g:condition>new</g:condition>
+      <g:color>Natural Wood</g:color>
+      <g:size>Standard</g:size>
+      <g:material>Cedar Wood</g:material>
+      <g:additional_image_link>https://example.com/images/ai-005-detail.jpg</g:additional_image_link>
+    </item>
+  </channel>
+</rss>

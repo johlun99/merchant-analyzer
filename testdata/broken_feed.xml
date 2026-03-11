@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0" xmlns:g="http://base.google.com/ns/1.0">
+  <channel>
+    <title>Broken Test Feed</title>
+    <item>
+      <g:id>prod-001</g:id>
+      <g:title>Good Product</g:title>
+      <g:description>A product with all fields.</g:description>
+      <g:price>19.99 SEK</g:price>
+      <g:availability>in stock</g:availability>
+      <g:link>https://example.com/products/prod-001</g:link>
+      <g:image_link>https://example.com/images/prod-001.jpg</g:image_link>
+    </item>
+    <item>
+      <g:id></g:id>
+      <g:title>Product With Empty ID and Price</g:title>
+      <g:description>This product has an empty id and price.</g:description>
+      <g:price></g:price>
+      <g:availability>in stock</g:availability>
+      <g:link>https://example.com/products/prod-002</g:link>
+      <g:image_link>https://example.com/images/prod-002.jpg</g:image_link>
+    </item>
+    <item>
+      <g:id>prod-003</g:id>
+      <g:title>Last Product</g:title>
+      <g:description>Third product before truncation.</g:description>
+      <g:price>9.99 SEK</g:price>
+      <g:availability>in stock</g:availability>
+      <g:link>https://example.com/products/prod-003</g:link>
+      <g:image_link>https://example.com/images/prod-003.jpg</g:image_link>
+    </item>
+<!-- Feed is intentionally truncated here — no closing tags -->
