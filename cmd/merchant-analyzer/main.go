@@ -92,11 +92,29 @@ func runTUI(f *feed.Feed, checkers []checker.Checker) error {
 	return nil
 }
 
+func printProgress(done, total int, label string) {
+	const width = 24
+	filled := 0
+	if total > 0 {
+		filled = done * width / total
+	}
+	bar := strings.Repeat("█", filled) + strings.Repeat("░", width-filled)
+	fmt.Fprintf(os.Stderr, "\r  [%s] %d/%d  %-30s", bar, done, total, label)
+}
+
 func runNoTUI(f *feed.Feed, checkers []checker.Checker, outputFile string) error {
 	ctx := context.Background()
+	total := len(checkers)
 	var results []checker.Result
-	for _, c := range checkers {
+	for i, c := range checkers {
+		if outputFile != "" {
+			printProgress(i, total, c.Name()+"...")
+		}
 		results = append(results, c.Run(ctx, f))
+	}
+	if outputFile != "" {
+		printProgress(total, total, "Done")
+		fmt.Fprintln(os.Stderr)
 	}
 
 	fmt.Printf("\nmerchant-analyzer — %s\n", f.URL)
