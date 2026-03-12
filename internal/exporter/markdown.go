@@ -42,7 +42,37 @@ func ToMarkdown(r Report) string {
 	}
 
 	b.WriteString(renderExamples(r.Results))
+	b.WriteString(renderAttributes(r.Attributes))
 
+	return b.String()
+}
+
+// renderAttributes returns a Markdown "## Attributes" section, or "" if no groups have items.
+func renderAttributes(groups []AttributeGroup) string {
+	hasItems := false
+	for _, g := range groups {
+		if len(g.Items) > 0 {
+			hasItems = true
+			break
+		}
+	}
+	if !hasItems {
+		return ""
+	}
+
+	var b strings.Builder
+	fmt.Fprintf(&b, "## Attributes\n\n")
+	for _, g := range groups {
+		if len(g.Items) == 0 {
+			continue
+		}
+		fmt.Fprintf(&b, "### %s (%d)\n\n", g.Category, len(g.Items))
+		fmt.Fprintf(&b, "| Attribute | Coverage | Tags |\n|-----------|----------|------|\n")
+		for _, a := range g.Items {
+			fmt.Fprintf(&b, "| `%s` | %d%% | %s |\n", a.Name, a.Coverage, strings.Join(a.Tags, ", "))
+		}
+		fmt.Fprintln(&b)
+	}
 	return b.String()
 }
 

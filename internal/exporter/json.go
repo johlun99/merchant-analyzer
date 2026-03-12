@@ -9,6 +9,19 @@ import (
 	"github.com/johlun99/merchant-analyzer/internal/checker"
 )
 
+// AttributeGroup is a named, prioritised group of feed attributes for export.
+type AttributeGroup struct {
+	Category string
+	Items    []Attribute
+}
+
+// Attribute is a single feed attribute with its classification tags and product coverage.
+type Attribute struct {
+	Name     string
+	Tags     []string
+	Coverage int // 0–100: percentage of products that have this attribute
+}
+
 // Report holds all data for an export.
 type Report struct {
 	URL          string
@@ -16,14 +29,27 @@ type Report struct {
 	Size         int64
 	ProductCount int
 	Results      []checker.Result
+	Attributes   []AttributeGroup
 }
 
 type jsonReport struct {
-	URL          string       `json:"url"`
-	FetchTimeMs  int64        `json:"fetch_time_ms"`
-	SizeBytes    int64        `json:"size_bytes"`
-	ProductCount int          `json:"product_count"`
-	Results      []jsonResult `json:"results"`
+	URL          string          `json:"url"`
+	FetchTimeMs  int64           `json:"fetch_time_ms"`
+	SizeBytes    int64           `json:"size_bytes"`
+	ProductCount int             `json:"product_count"`
+	Results      []jsonResult    `json:"results"`
+	Attributes   []jsonAttrGroup `json:"attributes,omitempty"`
+}
+
+type jsonAttrGroup struct {
+	Category string     `json:"category"`
+	Items    []jsonAttr `json:"items"`
+}
+
+type jsonAttr struct {
+	Name     string   `json:"name"`
+	Tags     []string `json:"tags"`
+	Coverage int      `json:"coverage"`
 }
 
 type jsonResult struct {
@@ -64,6 +90,17 @@ func ToJSON(r Report) ([]byte, error) {
 			})
 		}
 		jr.Results = append(jr.Results, jr2)
+	}
+
+	for _, g := range r.Attributes {
+		if len(g.Items) == 0 {
+			continue
+		}
+		jg := jsonAttrGroup{Category: g.Category}
+		for _, a := range g.Items {
+			jg.Items = append(jg.Items, jsonAttr(a))
+		}
+		jr.Attributes = append(jr.Attributes, jg)
 	}
 
 	data, err := json.MarshalIndent(jr, "", "  ")

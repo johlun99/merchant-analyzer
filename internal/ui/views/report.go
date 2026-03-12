@@ -353,54 +353,139 @@ func (v ReportView) renderAttributesTab() string {
 	if v.Feed == nil || len(v.Feed.Products) == 0 {
 		return "  No products in feed.\n"
 	}
-	present := collectPresentAttrs(v.Feed)
-	names := make([]string, 0, len(present))
-	for name := range present {
-		names = append(names, name)
-	}
-	sort.Strings(names)
-
+	groups := buildAttributeGroups(v.Feed)
 	var b strings.Builder
-	fmt.Fprintf(&b, "\n  %d attributes found in feed\n\n", len(names))
-	for _, name := range names {
-		meta, known := knownAttrs[name]
-		badges := renderAttrBadges(meta, !known)
-		fmt.Fprintf(&b, "  %-32s%s\n", name, badges)
+	total := 0
+	for _, g := range groups {
+		total += len(g.Items)
+	}
+	fmt.Fprintf(&b, "\n  %d attributes found in feed\n\n", total)
+	for _, g := range groups {
+		if len(g.Items) == 0 {
+			continue
+		}
+		fmt.Fprintf(&b, "  %s\n", renderGroupDivider(g.Category, v.Width))
+		for _, a := range g.Items {
+			meta, known := knownAttrs[a.Name]
+			badges := renderAttrBadges(meta, !known)
+			cov := styles.StyleMetric.Render(fmt.Sprintf("%3d%%", a.Coverage))
+			fmt.Fprintf(&b, "  %-32s%s  %s\n", a.Name, cov, badges)
+		}
+		fmt.Fprintln(&b)
 	}
 	return b.String()
 }
 
-func collectPresentAttrs(f *feed.Feed) map[string]struct{} {
-	present := make(map[string]struct{})
+func renderGroupDivider(label string, width int) string {
+	prefix := "── " + label + " "
+	rest := width - len(prefix) - 2
+	if rest < 4 {
+		rest = 4
+	}
+	return styles.StyleMetricLabel.Render(prefix + strings.Repeat("─", rest))
+}
+
+// buildAttributeGroups groups feed attributes by priority category with coverage percentages.
+// It is the single source of truth consumed by both the TUI and BuildReport.
+func buildAttributeGroups(f *feed.Feed) []exporter.AttributeGroup {
+	coverage := collectAttrCoverage(f)
+	total := len(f.Products)
+	order := []string{"Required", "Recommended", "AI", "Supported", "Custom"}
+	groups := make(map[string]*exporter.AttributeGroup, len(order))
+	for _, cat := range order {
+		groups[cat] = &exporter.AttributeGroup{Category: cat}
+	}
+	names := make([]string, 0, len(coverage))
+	for name := range coverage {
+		names = append(names, name)
+	}
+	sort.Strings(names)
+	for _, name := range names {
+		meta, known := knownAttrs[name]
+		cat := primaryCategory(meta, !known)
+		tags := attrTags(meta, !known)
+		pct := 0
+		if total > 0 {
+			pct = coverage[name] * 100 / total
+		}
+		groups[cat].Items = append(groups[cat].Items, exporter.Attribute{Name: name, Tags: tags, Coverage: pct})
+	}
+	result := make([]exporter.AttributeGroup, 0, len(order))
+	for _, cat := range order {
+		result = append(result, *groups[cat])
+	}
+	return result
+}
+
+func primaryCategory(meta attrMeta, isCustom bool) string {
+	switch {
+	case isCustom:
+		return "Custom"
+	case meta.GoogleRequired:
+		return "Required"
+	case meta.GoogleRecommended:
+		return "Recommended"
+	case meta.AIReady:
+		return "AI"
+	case meta.GoogleSupported:
+		return "Supported"
+	default:
+		return "Custom"
+	}
+}
+
+func attrTags(meta attrMeta, isCustom bool) []string {
+	var tags []string
+	if meta.GoogleRequired {
+		tags = append(tags, "Required")
+	}
+	if meta.GoogleRecommended {
+		tags = append(tags, "Recommended")
+	}
+	if meta.GoogleSupported {
+		tags = append(tags, "Supported")
+	}
+	if meta.AIReady {
+		tags = append(tags, "AI")
+	}
+	if isCustom {
+		tags = append(tags, "Custom")
+	}
+	return tags
+}
+
+// collectAttrCoverage returns a map of attribute name → count of products that have it.
+func collectAttrCoverage(f *feed.Feed) map[string]int {
+	counts := make(map[string]int)
 	for i := range f.Products {
 		p := &f.Products[i]
-		checkField := func(name, val string) {
+		countField := func(name, val string) {
 			if val != "" {
-				present[name] = struct{}{}
+				counts[name]++
 			}
 		}
-		checkField("id", p.ID)
-		checkField("title", p.Title)
-		checkField("description", p.Description)
-		checkField("price", p.Price)
-		checkField("availability", p.Availability)
-		checkField("link", p.Link)
-		checkField("image_link", p.ImageLink)
-		checkField("brand", p.Brand)
-		checkField("gtin", p.GTIN)
-		checkField("mpn", p.MPN)
-		checkField("condition", p.Condition)
-		checkField("color", p.Color)
-		checkField("size", p.Size)
-		checkField("material", p.Material)
+		countField("id", p.ID)
+		countField("title", p.Title)
+		countField("description", p.Description)
+		countField("price", p.Price)
+		countField("availability", p.Availability)
+		countField("link", p.Link)
+		countField("image_link", p.ImageLink)
+		countField("brand", p.Brand)
+		countField("gtin", p.GTIN)
+		countField("mpn", p.MPN)
+		countField("condition", p.Condition)
+		countField("color", p.Color)
+		countField("size", p.Size)
+		countField("material", p.Material)
 		if len(p.AdditionalImages) > 0 {
-			present["additional_image_link"] = struct{}{}
+			counts["additional_image_link"]++
 		}
 		for k := range p.Extra {
-			present[k] = struct{}{}
+			counts[k]++
 		}
 	}
-	return present
+	return counts
 }
 
 func renderAttrBadges(meta attrMeta, isCustom bool) string {
@@ -442,5 +527,6 @@ func BuildReport(f *feed.Feed, results []checker.Result) exporter.Report {
 		Size:         f.Size,
 		ProductCount: f.ProductCount,
 		Results:      results,
+		Attributes:   buildAttributeGroups(f),
 	}
 }

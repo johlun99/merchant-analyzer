@@ -175,6 +175,102 @@ func TestJSONExportContainsExamples(t *testing.T) {
 	}
 }
 
+func reportWithAttributes() exporter.Report {
+	return exporter.Report{
+		URL:          "https://example.com/feed.xml",
+		FetchTime:    500 * time.Millisecond,
+		Size:         1024,
+		ProductCount: 10,
+		Attributes: []exporter.AttributeGroup{
+			{
+				Category: "Required",
+				Items: []exporter.Attribute{
+					{Name: "id", Tags: []string{"Required", "AI"}, Coverage: 100},
+					{Name: "title", Tags: []string{"Required", "AI"}, Coverage: 100},
+				},
+			},
+			{
+				Category: "Recommended",
+				Items: []exporter.Attribute{
+					{Name: "brand", Tags: []string{"Recommended", "AI"}, Coverage: 80},
+				},
+			},
+			{Category: "AI", Items: nil},
+			{Category: "Supported", Items: nil},
+			{
+				Category: "Custom",
+				Items: []exporter.Attribute{
+					{Name: "custom_field", Tags: []string{"Custom"}, Coverage: 40},
+				},
+			},
+		},
+	}
+}
+
+func TestAttributeGroupsInJSON(t *testing.T) {
+	data, err := exporter.ToJSON(reportWithAttributes())
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	body := string(data)
+	if !strings.Contains(body, `"attributes"`) {
+		t.Error(`JSON missing "attributes" key`)
+	}
+	if !strings.Contains(body, `"Required"`) {
+		t.Error(`JSON attributes missing "Required" category`)
+	}
+	if !strings.Contains(body, `"coverage"`) {
+		t.Error(`JSON attributes missing "coverage" field`)
+	}
+}
+
+func TestAttributeGroupsEmptyCategoryOmittedJSON(t *testing.T) {
+	data, err := exporter.ToJSON(reportWithAttributes())
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	body := string(data)
+	// "AI" and "Supported" groups have no items and should be omitted
+	// We check that only non-empty categories appear as top-level entries
+	// by verifying the total count (Required, Recommended, Custom = 3)
+	_ = body // structural check via JSON unmarshal
+	var out map[string]any
+	if err := json.Unmarshal(data, &out); err != nil {
+		t.Fatalf("invalid JSON: %v", err)
+	}
+	attrs, ok := out["attributes"].([]any)
+	if !ok {
+		t.Fatal("attributes is not an array")
+	}
+	for _, g := range attrs {
+		grp := g.(map[string]any)
+		items, _ := grp["items"].([]any)
+		if len(items) == 0 {
+			t.Errorf("empty group %q should be omitted from JSON", grp["category"])
+		}
+	}
+}
+
+func TestAttributeGroupsInMarkdown(t *testing.T) {
+	md := exporter.ToMarkdown(reportWithAttributes())
+	for _, want := range []string{"## Attributes", "### Required", "### Recommended", "### Custom", "Coverage"} {
+		if !strings.Contains(md, want) {
+			t.Errorf("Markdown missing %q", want)
+		}
+	}
+}
+
+func TestAttributeGroupsEmptyCategoryOmittedMarkdown(t *testing.T) {
+	md := exporter.ToMarkdown(reportWithAttributes())
+	// "AI" and "Supported" have no items — their headers should not appear
+	if strings.Contains(md, "### AI\n") {
+		t.Error("Markdown should omit empty AI group")
+	}
+	if strings.Contains(md, "### Supported\n") {
+		t.Error("Markdown should omit empty Supported group")
+	}
+}
+
 func TestJSONExportNoExamplesKeyWhenNone(t *testing.T) {
 	data, err := exporter.ToJSON(sampleReport())
 	if err != nil {
