@@ -28,6 +28,10 @@ merchant-analyzer "https://example.com/feed.xml" --output report.md
 
 # CI / non-interactive (exits with code 1 if errors found)
 merchant-analyzer "https://example.com/feed.xml" --no-tui
+
+# Print version
+merchant-analyzer --version
+merchant-analyzer -v
 ```
 
 > **Note:** Always quote URLs that contain query parameters (e.g. `?key=value&other=value`). Without quotes the shell interprets `&` as a background operator and splits the command.
@@ -57,6 +61,9 @@ export PATH="$PATH:$(go env GOPATH)/bin"
 git clone git@github.com:johlun99/merchant-analyzer.git
 cd merchant-analyzer
 go build -o merchant-analyzer ./cmd/merchant-analyzer
+
+# Embed a version string at build time
+go build -ldflags="-X main.version=v0.2.0" -o merchant-analyzer ./cmd/merchant-analyzer
 ```
 
 Move the binary to a directory in your `PATH`:
@@ -64,6 +71,16 @@ Move the binary to a directory in your `PATH`:
 ```bash
 # macOS / Linux
 sudo mv merchant-analyzer /usr/local/bin/
+```
+
+## Man Page
+
+Generate and install the man page:
+
+```bash
+go generate ./...
+sudo cp docs/merchant-analyzer.1 /usr/local/share/man/man1/
+man merchant-analyzer
 ```
 
 ## Uninstall
