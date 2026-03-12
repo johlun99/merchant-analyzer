@@ -3,6 +3,7 @@ package googlespec_test
 
 import (
 	"context"
+	"fmt"
 	"strings"
 	"testing"
 
@@ -341,4 +342,209 @@ func TestGoogleSpecInvalidGender(t *testing.T) {
 	if !found {
 		t.Error("expected item for field \"gender\"")
 	}
+}
+
+// feedFromItems wraps multiple item XML strings in a minimal RSS envelope and parses it.
+func feedFromItems(t *testing.T, itemsXML []string) *feed.Feed {
+	t.Helper()
+	var sb strings.Builder
+	sb.WriteString(`<?xml version="1.0" encoding="UTF-8"?><rss version="2.0" xmlns:g="http://base.google.com/ns/1.0"><channel>`)
+	for _, item := range itemsXML {
+		sb.WriteString("<item>")
+		sb.WriteString(item)
+		sb.WriteString("</item>")
+	}
+	sb.WriteString("</channel></rss>")
+	f, err := feed.Parse([]byte(sb.String()))
+	if err != nil {
+		t.Fatalf("parse failed: %v", err)
+	}
+	return f
+}
+
+func TestGoogleSpecSubScoresPresent(t *testing.T) {
+	f := feedFromItem(t, cleanItem)
+	r := runChecker(t, f)
+	if len(r.SubScores) != 3 {
+		t.Fatalf("expected 3 sub-scores, got %d: %v", len(r.SubScores), r.SubScores)
+	}
+	want := []string{"Required", "Recommended", "Format"}
+	for i, w := range want {
+		if r.SubScores[i].Label != w {
+			t.Errorf("SubScores[%d].Label = %q, want %q", i, r.SubScores[i].Label, w)
+		}
+	}
+}
+
+func TestGoogleSpecAllSubScores100OnCleanFeed(t *testing.T) {
+	f := feedFromItem(t, cleanItem)
+	r := runChecker(t, f)
+	if len(r.SubScores) != 3 {
+		t.Fatalf("expected 3 sub-scores, got %d", len(r.SubScores))
+	}
+	for _, ss := range r.SubScores {
+		if ss.Score != 100 {
+			t.Errorf("SubScore %q = %d, want 100", ss.Label, ss.Score)
+		}
+	}
+}
+
+func TestGoogleSpecRequiredSubScoreDecreases(t *testing.T) {
+	// Product missing required "price" → Required score < 100.
+	f := feedFromItem(t, `
+      <g:id>prod-001</g:id>
+      <g:title>Blue Running Shoes</g:title>
+      <g:description>A great pair of shoes.</g:description>
+      <g:availability>in stock</g:availability>
+      <g:link>https://example.com/products/prod-001</g:link>
+      <g:image_link>https://example.com/images/prod-001.jpg</g:image_link>
+      <g:brand>RunFast</g:brand>
+      <g:google_product_category>Shoes</g:google_product_category>
+      <g:mpn>RUN-001-BLU</g:mpn>
+      <g:additional_image_link>https://example.com/images/prod-001-side.jpg</g:additional_image_link>
+      <g:product_type>Footwear &gt; Running Shoes</g:product_type>`)
+	r := runChecker(t, f)
+	if len(r.SubScores) == 0 {
+		t.Fatal("expected sub-scores, got none")
+	}
+	for _, ss := range r.SubScores {
+		if ss.Label == "Required" && ss.Score == 100 {
+			t.Errorf("Required sub-score should be < 100 when required field missing, got 100")
+		}
+	}
+}
+
+func TestGoogleSpecRecommendedSubScoreDecreases(t *testing.T) {
+	// Product missing recommended "brand" → Recommended score < 100.
+	f := feedFromItem(t, `
+      <g:id>prod-001</g:id>
+      <g:title>Blue Running Shoes</g:title>
+      <g:description>A great pair of shoes.</g:description>
+      <g:price>89.99 SEK</g:price>
+      <g:availability>in stock</g:availability>
+      <g:link>https://example.com/products/prod-001</g:link>
+      <g:image_link>https://example.com/images/prod-001.jpg</g:image_link>
+      <g:google_product_category>Shoes</g:google_product_category>`)
+	r := runChecker(t, f)
+	if len(r.SubScores) == 0 {
+		t.Fatal("expected sub-scores, got none")
+	}
+	for _, ss := range r.SubScores {
+		if ss.Label == "Recommended" && ss.Score == 100 {
+			t.Errorf("Recommended sub-score should be < 100 when recommended field missing, got 100")
+		}
+	}
+}
+
+func TestGoogleSpecFormatSubScoreDecreases(t *testing.T) {
+	// Product has invalid "condition" value → Format score < 100.
+	f := feedFromItem(t, requiredBase+`
+      <g:condition>like-new</g:condition>`)
+	r := runChecker(t, f)
+	if len(r.SubScores) == 0 {
+		t.Fatal("expected sub-scores, got none")
+	}
+	for _, ss := range r.SubScores {
+		if ss.Label == "Format" && ss.Score == 100 {
+			t.Errorf("Format sub-score should be < 100 when format is invalid, got 100")
+		}
+	}
+}
+
+func TestGoogleSpecExamplesPopulated(t *testing.T) {
+	// Missing required "price" → examples for that item should be non-empty.
+	f := feedFromItem(t, `
+      <g:id>prod-001</g:id>
+      <g:title>Blue Running Shoes</g:title>
+      <g:description>A great pair of shoes.</g:description>
+      <g:availability>in stock</g:availability>
+      <g:link>https://example.com/products/prod-001</g:link>
+      <g:image_link>https://example.com/images/prod-001.jpg</g:image_link>
+      <g:brand>RunFast</g:brand>
+      <g:google_product_category>Shoes</g:google_product_category>`)
+	r := runChecker(t, f)
+	for _, item := range r.Items {
+		if item.Field == "price" {
+			if len(item.Examples) == 0 {
+				t.Error("expected examples for price violation, got none")
+			}
+			return
+		}
+	}
+	t.Error("expected item for field \"price\"")
+}
+
+func TestGoogleSpecExamplesCappedAt10(t *testing.T) {
+	// 15 products all missing "price" → at most 10 examples.
+	items := make([]string, 15)
+	for i := range items {
+		items[i] = fmt.Sprintf(`
+      <g:id>prod-%03d</g:id>
+      <g:title>Product %d</g:title>
+      <g:description>Description for product %d.</g:description>
+      <g:availability>in stock</g:availability>
+      <g:link>https://example.com/products/prod-%03d</g:link>
+      <g:image_link>https://example.com/images/prod-%03d.jpg</g:image_link>
+      <g:brand>Brand</g:brand>
+      <g:google_product_category>Shoes</g:google_product_category>`, i+1, i+1, i+1, i+1, i+1)
+	}
+	f := feedFromItems(t, items)
+	r := runChecker(t, f)
+	for _, item := range r.Items {
+		if item.Field == "price" {
+			if len(item.Examples) == 0 {
+				t.Errorf("expected examples, got none")
+			}
+			if len(item.Examples) > 10 {
+				t.Errorf("examples capped at 10, got %d", len(item.Examples))
+			}
+			return
+		}
+	}
+	t.Error("expected item for field \"price\"")
+}
+
+func TestGoogleSpecExamplesShowMissingLabel(t *testing.T) {
+	// Missing field should produce an example containing "(missing)".
+	f := feedFromItem(t, `
+      <g:id>prod-001</g:id>
+      <g:title>Blue Running Shoes</g:title>
+      <g:description>A great pair of shoes.</g:description>
+      <g:availability>in stock</g:availability>
+      <g:link>https://example.com/products/prod-001</g:link>
+      <g:image_link>https://example.com/images/prod-001.jpg</g:image_link>
+      <g:brand>RunFast</g:brand>
+      <g:google_product_category>Shoes</g:google_product_category>`)
+	r := runChecker(t, f)
+	for _, item := range r.Items {
+		if item.Field == "price" {
+			for _, ex := range item.Examples {
+				if strings.Contains(ex, "(missing)") {
+					return
+				}
+			}
+			t.Errorf("expected example to contain \"(missing)\", got %v", item.Examples)
+			return
+		}
+	}
+	t.Error("expected item for field \"price\"")
+}
+
+func TestGoogleSpecExamplesShowBadValue(t *testing.T) {
+	// Invalid format value should appear in the example string.
+	f := feedFromItem(t, requiredBase+`
+      <g:condition>like-new</g:condition>`)
+	r := runChecker(t, f)
+	for _, item := range r.Items {
+		if item.Field == "condition" {
+			for _, ex := range item.Examples {
+				if strings.Contains(ex, "like-new") {
+					return
+				}
+			}
+			t.Errorf("expected example to contain bad value \"like-new\", got %v", item.Examples)
+			return
+		}
+	}
+	t.Error("expected item for field \"condition\"")
 }
