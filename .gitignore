@@ -1,0 +1,15 @@
+# Binaries
+merchant-analyzer
+
+# Build output
+dist/
+
+# IDE / editor
+.vscode/
+.idea/
+
+# Claude Code session data
+.claude/
+
+# OS
+.DS_Store
