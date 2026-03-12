@@ -43,10 +43,11 @@ type clearExportMsgMsg struct{}
 
 // Model is the root Bubbletea model.
 type Model struct {
-	feed     *feed.Feed
-	checkers []checker.Checker
-	cancel   context.CancelFunc
-	program  *tea.Program
+	feed       *feed.Feed
+	checkers   []checker.Checker
+	cancel     context.CancelFunc
+	program    *tea.Program
+	outputFile string
 
 	state   viewState
 	loading views.LoadingView
@@ -62,7 +63,7 @@ type Model struct {
 }
 
 // New creates a new Model.
-func New(f *feed.Feed, checkers []checker.Checker) *Model {
+func New(f *feed.Feed, checkers []checker.Checker, outputFile string) *Model {
 	names := make([]string, len(checkers))
 	for i, c := range checkers {
 		names[i] = c.Name()
@@ -72,6 +73,7 @@ func New(f *feed.Feed, checkers []checker.Checker) *Model {
 		checkers:    checkers,
 		loading:     views.NewLoadingView(f.URL, names),
 		totalChecks: len(checkers),
+		outputFile:  outputFile,
 	}
 }
 
@@ -132,7 +134,7 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.mu.Unlock()
 
 	case allDoneMsg:
-		m.transitionToReport()
+		return m, m.transitionToReport()
 
 	case exportDoneMsg:
 		if m.report != nil {
@@ -186,10 +188,11 @@ func (m *Model) handleExportKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	switch msg.String() {
 	case "esc":
 		m.report.CloseExport()
+		return m, nil
 	case "enter":
 		return m, m.doExport(m.report.ExportInput.Value())
 	}
-	return m, nil
+	return m.updateReport(msg)
 }
 
 func (m *Model) handleNavigationKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
@@ -219,10 +222,14 @@ func (m *Model) updateReport(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return m, cmd
 }
 
-func (m *Model) transitionToReport() {
+func (m *Model) transitionToReport() tea.Cmd {
 	rv := views.NewReportView(m.feed, m.results, m.width, m.height)
 	m.report = &rv
 	m.state = viewReport
+	if m.outputFile != "" {
+		return m.doExport(m.outputFile)
+	}
+	return nil
 }
 
 func (m *Model) doExport(filename string) tea.Cmd {
