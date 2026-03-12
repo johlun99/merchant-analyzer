@@ -127,7 +127,6 @@ func computeLLMScore(products []feed.Product) (float64, []checker.Item) {
 		{"color", func(p *feed.Product) bool { return p.Color != "" }},
 		{"size", func(p *feed.Product) bool { return p.Size != "" }},
 		{"material", func(p *feed.Product) bool { return p.Material != "" }},
-		{"additional_image_link", func(p *feed.Product) bool { return len(p.AdditionalImages) > 0 }},
 		{"description_length", func(p *feed.Product) bool { return len(p.Description) > minDescriptionLen }},
 	}
 

@@ -131,7 +131,7 @@ func TestAIReadinessCheckerScoringFormula(t *testing.T) {
 		t.Fatal("Score should not be nil")
 	}
 	// UCP: 10/10 fields present = 40pts
-	// LLM: 0/5 (no color, size, material, additional_image, desc too short) = 0pts
+	// LLM: 0/4 (no color, size, material, desc too short) = 0pts
 	// Image: image_link present = 15pts, no additional = 0pts
 	// Total = 55
 	expected := 55
