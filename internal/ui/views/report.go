@@ -293,12 +293,27 @@ func (v ReportView) renderAITab() string {
 			bullet := styles.StyleMetricLabel.Render("  •")
 			field := lipgloss.NewStyle().Bold(true).Render(item.Field)
 			fmt.Fprintf(&b, "%s %s: %s\n", bullet, field, item.Message)
+			if item.Impact != "" {
+				badge := renderImpactBadge(item.Impact)
+				fmt.Fprintf(&b, "    %s  %s\n", badge, styles.StyleMetricLabel.Render(item.ImpactDesc))
+			}
 			for _, ex := range item.Examples {
 				fmt.Fprintf(&b, "    %s\n", styles.StyleMetricLabel.Render(ex))
 			}
 		}
 	}
 	return b.String()
+}
+
+func renderImpactBadge(impact string) string {
+	switch impact {
+	case "High":
+		return styles.StyleStatusOK.Render("[↑ High impact]")
+	case "Medium":
+		return styles.StyleStatusWarning.Render("[→ Medium impact]")
+	default:
+		return styles.StyleMetricLabel.Render("[↓ Low impact]")
+	}
 }
 
 func renderStatus(s checker.Status) string {

@@ -210,3 +210,55 @@ func TestAIReadinessCheckerScoringFormula(t *testing.T) {
 		t.Errorf("Score = %d, want %d", *result.Score, expected)
 	}
 }
+
+func TestAIReadinessItemsHaveImpact(t *testing.T) {
+	// A feed that triggers at least one AI Readiness finding.
+	// Every item with a finding must have a non-empty Impact.
+	products := []feed.Product{
+		{
+			ID:    "p001",
+			Title: "Test Product",
+			// Missing color, size, material, short description, no additional image
+			Description:  "Short.",
+			Price:        "9.99 SEK",
+			Availability: "in stock",
+			Link:         "https://example.com/p001",
+			ImageLink:    "https://example.com/img.jpg",
+			Brand:        "ACME",
+			GTIN:         "12345678",
+			Condition:    "new",
+		},
+	}
+	f := &feed.Feed{Products: products, ProductCount: 1}
+	c := aireadiness.NewChecker()
+	result := c.Run(context.Background(), f)
+
+	if len(result.Items) == 0 {
+		t.Fatal("expected at least one finding")
+	}
+	for _, item := range result.Items {
+		if item.Impact == "" {
+			t.Errorf("item %q has empty Impact; want High/Medium/Low", item.Field)
+		}
+		if item.ImpactDesc == "" {
+			t.Errorf("item %q has empty ImpactDesc", item.Field)
+		}
+	}
+}
+
+func TestAIReadinessImpactValuesAreValid(t *testing.T) {
+	// Impact must be one of the three recognised levels.
+	products := []feed.Product{
+		{ID: "p001", Title: "T", Description: "D", Price: "9.99 SEK", Availability: "in stock",
+			Link: "https://example.com", ImageLink: "https://example.com/img.jpg"},
+	}
+	f := &feed.Feed{Products: products, ProductCount: 1}
+	result := aireadiness.NewChecker().Run(context.Background(), f)
+
+	valid := map[string]bool{"High": true, "Medium": true, "Low": true}
+	for _, item := range result.Items {
+		if item.Impact != "" && !valid[item.Impact] {
+			t.Errorf("item %q has invalid Impact %q; want High/Medium/Low", item.Field, item.Impact)
+		}
+	}
+}

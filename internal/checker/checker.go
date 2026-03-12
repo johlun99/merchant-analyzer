@@ -26,10 +26,12 @@ type SubScore struct {
 
 // Item is a single finding from a checker.
 type Item struct {
-	Field    string
-	Message  string
-	Count    int      // number of products affected
-	Examples []string // up to 10 affected product descriptions; nil for non-googlespec checkers
+	Field      string
+	Message    string
+	Count      int      // number of products affected
+	Examples   []string // up to 10 affected product descriptions; nil for non-googlespec checkers
+	Impact     string   // optional: "High", "Medium", or "Low"
+	ImpactDesc string   // optional: one-liner explaining why this attribute matters for AI
 }
 
 // Result is the outcome of running a single checker.

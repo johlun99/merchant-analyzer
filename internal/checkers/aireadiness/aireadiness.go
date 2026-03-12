@@ -12,6 +12,34 @@ import (
 
 const minDescriptionLen = 150
 
+// fieldImpact holds static AI-readiness impact metadata for a feed attribute.
+type fieldImpact struct {
+	level string // "High", "Medium", or "Low"
+	desc  string // one-liner explaining why this attribute matters for AI
+}
+
+//nolint:gochecknoglobals
+var impactRegistry = map[string]fieldImpact{
+	// UCP fields
+	"id":           {"High", "Unique IDs let AI systems track and de-duplicate products reliably"},
+	"title":        {"High", "Titles are the primary signal for semantic search and discovery"},
+	"description":  {"High", "Rich descriptions are the main LLM context for product understanding"},
+	"price":        {"Medium", "Price data is required for transaction-eligible search results"},
+	"availability": {"Medium", "Availability filters keep AI results shoppable in real time"},
+	"link":         {"Low", "Product URLs are required for click-through but rarely affect AI ranking"},
+	"image_link":   {"High", "Primary images power visual AI search and product recognition"},
+	"brand":        {"High", "Brand signals sharpen recommendation precision and semantic matching"},
+	"gtin_or_mpn":  {"High", "Unique identifiers enable AI to match products across catalogs"},
+	"condition":    {"Medium", "Condition signals refine AI results for new vs. used product queries"},
+	// LLM attributes
+	"color":              {"High", "Color attributes are critical for visual AI discovery and filtering"},
+	"size":               {"High", "Size data powers personalised fit recommendations"},
+	"material":           {"Medium", "Material details enrich semantic product context for LLMs"},
+	"description_length": {"High", "Longer descriptions give LLMs richer context for intent matching"},
+	// Image attributes
+	"additional_image_link": {"High", "Multiple angles significantly improve visual AI recognition accuracy"},
+}
+
 // Checker evaluates how well a feed is optimized for AI-powered product discovery.
 type Checker struct{}
 
@@ -64,6 +92,14 @@ func (c *Checker) Run(_ context.Context, f *feed.Feed) checker.Result {
 		Items:  items,
 		Score:  checker.ScoreOf(total),
 	}
+}
+
+// impactFor returns the Impact and ImpactDesc for a field name from the registry.
+func impactFor(field string) (level, desc string) {
+	if meta, ok := impactRegistry[field]; ok {
+		return meta.level, meta.desc
+	}
+	return "", ""
 }
 
 // collectAIExamples returns up to limit example strings for products where failing returns true.
@@ -121,11 +157,14 @@ func computeUCPScore(products []feed.Product) (float64, []checker.Item) {
 		if coverage < 1.0 {
 			missing := total - present
 			fieldName := f.name
+			impLvl, impDesc := impactFor(fieldName)
 			items = append(items, checker.Item{
-				Field:    fieldName,
-				Message:  fmt.Sprintf("UCP: %d of %d products missing %q", missing, total, fieldName),
-				Count:    missing,
-				Examples: collectAIExamples(products, func(p *feed.Product) bool { return f.get(p) == "" }, func(_ *feed.Product) string { return fieldName + ": (missing)" }, 10),
+				Field:      fieldName,
+				Message:    fmt.Sprintf("UCP: %d of %d products missing %q", missing, total, fieldName),
+				Count:      missing,
+				Examples:   collectAIExamples(products, func(p *feed.Product) bool { return f.get(p) == "" }, func(_ *feed.Product) string { return fieldName + ": (missing)" }, 10),
+				Impact:     impLvl,
+				ImpactDesc: impDesc,
 			})
 		}
 	}
@@ -174,11 +213,14 @@ func computeLLMScore(products []feed.Product) (float64, []checker.Item) {
 		sumCoverage += coverage
 		if coverage < 1.0 {
 			missing := total - passing
+			impLvl, impDesc := impactFor(ch.name)
 			items = append(items, checker.Item{
-				Field:    ch.name,
-				Message:  fmt.Sprintf("LLM: %d of %d products missing %q", missing, total, ch.name),
-				Count:    missing,
-				Examples: collectAIExamples(products, func(p *feed.Product) bool { return !ch.pass(p) }, ch.label, 10),
+				Field:      ch.name,
+				Message:    fmt.Sprintf("LLM: %d of %d products missing %q", missing, total, ch.name),
+				Count:      missing,
+				Examples:   collectAIExamples(products, func(p *feed.Product) bool { return !ch.pass(p) }, ch.label, 10),
+				Impact:     impLvl,
+				ImpactDesc: impDesc,
 			})
 		}
 	}
@@ -209,20 +251,26 @@ func computeImageScore(products []feed.Product) (float64, []checker.Item) {
 	var items []checker.Item
 	if imageCoverage < 1.0 {
 		missing := total - withImage
+		impLvl, impDesc := impactFor("image_link")
 		items = append(items, checker.Item{
-			Field:    "image_link",
-			Message:  fmt.Sprintf("Image: %d of %d products missing image_link", missing, total),
-			Count:    missing,
-			Examples: collectAIExamples(products, func(p *feed.Product) bool { return p.ImageLink == "" }, func(_ *feed.Product) string { return "image_link: (missing)" }, 10),
+			Field:      "image_link",
+			Message:    fmt.Sprintf("Image: %d of %d products missing image_link", missing, total),
+			Count:      missing,
+			Examples:   collectAIExamples(products, func(p *feed.Product) bool { return p.ImageLink == "" }, func(_ *feed.Product) string { return "image_link: (missing)" }, 10),
+			Impact:     impLvl,
+			ImpactDesc: impDesc,
 		})
 	}
 	if additionalCoverage < 1.0 {
 		missing := total - withAdditional
+		impLvl, impDesc := impactFor("additional_image_link")
 		items = append(items, checker.Item{
-			Field:    "additional_image_link",
-			Message:  fmt.Sprintf("Image: %d of %d products missing additional_image_link", missing, total),
-			Count:    missing,
-			Examples: collectAIExamples(products, func(p *feed.Product) bool { return len(p.AdditionalImages) == 0 }, func(_ *feed.Product) string { return "additional_image_link: (missing)" }, 10),
+			Field:      "additional_image_link",
+			Message:    fmt.Sprintf("Image: %d of %d products missing additional_image_link", missing, total),
+			Count:      missing,
+			Examples:   collectAIExamples(products, func(p *feed.Product) bool { return len(p.AdditionalImages) == 0 }, func(_ *feed.Product) string { return "additional_image_link: (missing)" }, 10),
+			Impact:     impLvl,
+			ImpactDesc: impDesc,
 		})
 	}
 
