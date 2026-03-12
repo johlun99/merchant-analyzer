@@ -289,7 +289,8 @@ func (v ReportView) renderAITab() string {
 			return b.String()
 		}
 		fmt.Fprintf(&b, "  Improvements:\n\n")
-		for _, item := range r.Items {
+		items := sortedByImpact(r.Items)
+		for _, item := range items {
 			bullet := styles.StyleMetricLabel.Render("  •")
 			field := lipgloss.NewStyle().Bold(true).Render(item.Field)
 			fmt.Fprintf(&b, "%s %s: %s\n", bullet, field, item.Message)
@@ -297,12 +298,36 @@ func (v ReportView) renderAITab() string {
 				badge := renderImpactBadge(item.Impact)
 				fmt.Fprintf(&b, "    %s  %s\n", badge, styles.StyleMetricLabel.Render(item.ImpactDesc))
 			}
-			for _, ex := range item.Examples {
-				fmt.Fprintf(&b, "    %s\n", styles.StyleMetricLabel.Render(ex))
+			if len(item.Examples) > 0 {
+				fmt.Fprintln(&b)
+				for _, ex := range item.Examples {
+					fmt.Fprintf(&b, "      %s\n", styles.StyleMetricLabel.Render(ex))
+				}
+				fmt.Fprintln(&b)
 			}
 		}
 	}
 	return b.String()
+}
+
+func impactRank(impact string) int {
+	switch impact {
+	case "High":
+		return 0
+	case "Medium":
+		return 1
+	default:
+		return 2
+	}
+}
+
+func sortedByImpact(items []checker.Item) []checker.Item {
+	out := make([]checker.Item, len(items))
+	copy(out, items)
+	sort.SliceStable(out, func(i, j int) bool {
+		return impactRank(out[i].Impact) < impactRank(out[j].Impact)
+	})
+	return out
 }
 
 func renderImpactBadge(impact string) string {
