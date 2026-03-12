@@ -48,7 +48,10 @@ const cleanItem = `
       <g:condition>new</g:condition>
       <g:gtin>1234567890123</g:gtin>
       <g:age_group>adult</g:age_group>
-      <g:gender>unisex</g:gender>`
+      <g:gender>unisex</g:gender>
+      <g:mpn>RUN-001-BLU</g:mpn>
+      <g:additional_image_link>https://example.com/images/prod-001-side.jpg</g:additional_image_link>
+      <g:product_type>Footwear &gt; Running Shoes</g:product_type>`
 
 // requiredBase includes only the required fields + recommended presence fields.
 // Use this as the base for violation tests so the only violations come from
@@ -62,7 +65,10 @@ const requiredBase = `
       <g:link>https://example.com/products/prod-001</g:link>
       <g:image_link>https://example.com/images/prod-001.jpg</g:image_link>
       <g:brand>RunFast</g:brand>
-      <g:google_product_category>Shoes</g:google_product_category>`
+      <g:google_product_category>Shoes</g:google_product_category>
+      <g:mpn>RUN-001-BLU</g:mpn>
+      <g:additional_image_link>https://example.com/images/prod-001-side.jpg</g:additional_image_link>
+      <g:product_type>Footwear &gt; Running Shoes</g:product_type>`
 
 func TestGoogleSpecCleanFeedIsOK(t *testing.T) {
 	f := feedFromItem(t, cleanItem)
