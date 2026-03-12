@@ -2,6 +2,7 @@ package views
 
 import (
 	"fmt"
+	"sort"
 	"strings"
 
 	"github.com/charmbracelet/bubbles/textinput"
@@ -20,10 +21,11 @@ const (
 	TabChecks
 	TabGoogleSpec
 	TabAI
+	TabAttributes
 	TabCount
 )
 
-var tabNames = [TabCount]string{"Overview", "XML", "Checks", "Google Spec", "AI Score"}
+var tabNames = [TabCount]string{"Overview", "XML", "Checks", "Google Spec", "AI Score", "Attributes"}
 
 // ReportView renders the tabbed report and export overlay.
 type ReportView struct {
@@ -179,6 +181,8 @@ func (v *ReportView) refreshViewport() {
 		v.Viewport.SetContent(v.renderGoogleSpecTab())
 	case TabAI:
 		v.Viewport.SetContent(v.renderAITab())
+	case TabAttributes:
+		v.Viewport.SetContent(v.renderAttributesTab())
 	}
 }
 
@@ -325,6 +329,80 @@ func renderScoreBar(score, width int) string {
 		style = lipgloss.NewStyle().Foreground(lipgloss.Color("#EF4444"))
 	}
 	return style.Render(bar)
+}
+
+func (v ReportView) renderAttributesTab() string {
+	if v.Feed == nil || len(v.Feed.Products) == 0 {
+		return "  No products in feed.\n"
+	}
+	present := collectPresentAttrs(v.Feed)
+	names := make([]string, 0, len(present))
+	for name := range present {
+		names = append(names, name)
+	}
+	sort.Strings(names)
+
+	var b strings.Builder
+	fmt.Fprintf(&b, "\n  %d attributes found in feed\n\n", len(names))
+	for _, name := range names {
+		meta, known := knownAttrs[name]
+		badges := renderAttrBadges(meta, !known)
+		fmt.Fprintf(&b, "  %-32s%s\n", name, badges)
+	}
+	return b.String()
+}
+
+func collectPresentAttrs(f *feed.Feed) map[string]struct{} {
+	present := make(map[string]struct{})
+	for i := range f.Products {
+		p := &f.Products[i]
+		checkField := func(name, val string) {
+			if val != "" {
+				present[name] = struct{}{}
+			}
+		}
+		checkField("id", p.ID)
+		checkField("title", p.Title)
+		checkField("description", p.Description)
+		checkField("price", p.Price)
+		checkField("availability", p.Availability)
+		checkField("link", p.Link)
+		checkField("image_link", p.ImageLink)
+		checkField("brand", p.Brand)
+		checkField("gtin", p.GTIN)
+		checkField("mpn", p.MPN)
+		checkField("condition", p.Condition)
+		checkField("color", p.Color)
+		checkField("size", p.Size)
+		checkField("material", p.Material)
+		if len(p.AdditionalImages) > 0 {
+			present["additional_image_link"] = struct{}{}
+		}
+		for k := range p.Extra {
+			present[k] = struct{}{}
+		}
+	}
+	return present
+}
+
+func renderAttrBadges(meta attrMeta, isCustom bool) string {
+	var b strings.Builder
+	if meta.GoogleRequired {
+		b.WriteString(styles.StyleStatusError.Render("[Required]"))
+	}
+	if meta.GoogleRecommended {
+		b.WriteString(styles.StyleStatusWarning.Render("[Recommended]"))
+	}
+	if meta.GoogleSupported {
+		b.WriteString(styles.StyleMetric.Render("[Supported]"))
+	}
+	if meta.AIReady {
+		b.WriteString(" " + styles.StyleStatusOK.Render("[AI]"))
+	}
+	if isCustom {
+		b.WriteString(styles.StyleMetricLabel.Render("[Custom]"))
+	}
+	return b.String()
 }
 
 func formatBytes(b int64) string {

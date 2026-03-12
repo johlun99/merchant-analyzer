@@ -530,6 +530,26 @@ func TestGoogleSpecExamplesShowMissingLabel(t *testing.T) {
 	t.Error("expected item for field \"price\"")
 }
 
+func TestGoogleSpecScoreIsWeightedAverage(t *testing.T) {
+	// All required present (reqScore=100), no recommended (recScore=0), no format violations (fmtScore=100).
+	// weighted = (100*6 + 0*3 + 100 + 5) / 10 = 705/10 = 70
+	f := feedFromItem(t, `
+      <g:id>prod-001</g:id>
+      <g:title>Blue Running Shoes</g:title>
+      <g:description>A great pair of running shoes for all terrain use.</g:description>
+      <g:price>89.99 SEK</g:price>
+      <g:availability>in stock</g:availability>
+      <g:link>https://example.com/products/prod-001</g:link>
+      <g:image_link>https://example.com/images/prod-001.jpg</g:image_link>`)
+	r := runChecker(t, f)
+	if r.Score == nil {
+		t.Fatal("Score should not be nil")
+	}
+	if *r.Score != 70 {
+		t.Errorf("Score = %d, want 70 (weighted average)", *r.Score)
+	}
+}
+
 func TestGoogleSpecExamplesShowBadValue(t *testing.T) {
 	// Invalid format value should appear in the example string.
 	f := feedFromItem(t, requiredBase+`
