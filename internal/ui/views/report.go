@@ -176,7 +176,7 @@ func (v *ReportView) refreshViewport() {
 	case TabChecks:
 		v.Viewport.SetContent(v.renderCheckerTab("Attribute Check"))
 	case TabGoogleSpec:
-		v.Viewport.SetContent(v.renderCheckerTab("Google Feed Spec"))
+		v.Viewport.SetContent(v.renderGoogleSpecTab())
 	case TabAI:
 		v.Viewport.SetContent(v.renderAITab())
 	}
@@ -231,8 +231,41 @@ func (v ReportView) renderCheckerTab(name string) string {
 			bullet := styles.StyleMetricLabel.Render("  •")
 			field := lipgloss.NewStyle().Bold(true).Render(item.Field)
 			fmt.Fprintf(&b, "%s %s: %s\n", bullet, field, item.Message)
+			for _, ex := range item.Examples {
+				fmt.Fprintf(&b, "    %s\n", styles.StyleMetricLabel.Render(ex))
+			}
 		}
 	}
+	return b.String()
+}
+
+func (v ReportView) renderGoogleSpecTab() string {
+	var b strings.Builder
+	for _, r := range v.Results {
+		if r.Name != "Google Feed Spec" {
+			continue
+		}
+		if len(r.SubScores) == 3 {
+			colWidth := v.Width / 3
+			if colWidth < 20 {
+				colWidth = 20
+			}
+			var cols []string
+			for _, ss := range r.SubScores {
+				bar := renderScoreBar(ss.Score, 14)
+				col := lipgloss.NewStyle().Width(colWidth).Render(
+					fmt.Sprintf("  %s\n  %s  %s",
+						styles.StyleMetricLabel.Render(ss.Label),
+						styles.StyleMetric.Render(fmt.Sprintf("%d/100", ss.Score)),
+						bar,
+					),
+				)
+				cols = append(cols, col)
+			}
+			fmt.Fprintf(&b, "\n%s\n", lipgloss.JoinHorizontal(lipgloss.Top, cols...))
+		}
+	}
+	b.WriteString(v.renderCheckerTab("Google Feed Spec"))
 	return b.String()
 }
 
