@@ -15,15 +15,17 @@ A CLI tool that analyzes merchant product feeds (XML/RSS) and reports on feed qu
 
 ```bash
 # Interactive TUI
-merchant-analyzer https://example.com/feed.xml
+merchant-analyzer "https://example.com/feed.xml?locale=en"
 
 # Export report
-merchant-analyzer https://example.com/feed.xml --output report.json
-merchant-analyzer https://example.com/feed.xml --output report.md
+merchant-analyzer "https://example.com/feed.xml" --output report.json
+merchant-analyzer "https://example.com/feed.xml" --output report.md
 
 # CI / non-interactive (exits with code 1 if errors found)
-merchant-analyzer https://example.com/feed.xml --no-tui
+merchant-analyzer "https://example.com/feed.xml" --no-tui
 ```
+
+> **Note:** Always quote the URL if it contains query parameters (e.g. `?key=value&other=value`). Without quotes the shell interprets `&` as a background operator and splits the command.
 
 ## Installation
 
