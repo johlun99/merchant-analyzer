@@ -1,12 +1,17 @@
+//go:generate go run ../gendoc ../../docs
+
 // Package main is the entry point for the merchant-analyzer CLI.
 package main
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
+	"net/http"
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/spf13/cobra"
@@ -22,6 +27,8 @@ import (
 	"github.com/johlun99/merchant-analyzer/internal/ui/views"
 )
 
+var version = "dev" //nolint:gochecknoglobals
+
 func main() {
 	if err := rootCmd().Execute(); err != nil {
 		os.Exit(1)
@@ -33,10 +40,11 @@ func rootCmd() *cobra.Command {
 	var noTUI bool
 
 	cmd := &cobra.Command{
-		Use:   "merchant-analyzer <url|file>",
-		Short: "Analyze a merchant product feed",
-		Long:  "Fetch and analyze a merchant feed URL or local file, checking XML quality, attribute coverage, and AI readiness.",
-		Args:  cobra.ExactArgs(1),
+		Use:     "merchant-analyzer <url|file>",
+		Short:   "Analyze a merchant product feed",
+		Long:    "Fetch and analyze a merchant feed URL or local file, checking XML quality, attribute coverage, and AI readiness.",
+		Args:    cobra.ExactArgs(1),
+		Version: version,
 		RunE: func(_ *cobra.Command, args []string) error {
 			return run(args[0], outputFile, noTUI)
 		},
@@ -44,6 +52,7 @@ func rootCmd() *cobra.Command {
 
 	cmd.Flags().StringVarP(&outputFile, "output", "o", "", "export report to file (.json or .md)")
 	cmd.Flags().BoolVar(&noTUI, "no-tui", false, "print plain-text summary without interactive TUI")
+	cmd.Flags().BoolP("version", "v", false, "print version and exit")
 
 	return cmd
 }
@@ -55,7 +64,47 @@ func loadFeed(source string) (*feed.Feed, error) {
 	return feed.FromFile(source)
 }
 
+const githubReleasesURL = "https://api.github.com/repos/johlun99/merchant-analyzer/releases/latest"
+
+func fetchLatestVersion(timeout time.Duration) (string, bool) {
+	return fetchLatestVersionFromURL(githubReleasesURL, timeout)
+}
+
+func fetchLatestVersionFromURL(url string, timeout time.Duration) (string, bool) {
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+	defer cancel()
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil) //nolint:noctx
+	if err != nil {
+		return "", false
+	}
+	req.Header.Set("Accept", "application/vnd.github+json")
+
+	resp, err := http.DefaultClient.Do(req) //nolint:gosec
+	if err != nil || resp.StatusCode != http.StatusOK {
+		return "", false
+	}
+	defer func() { _ = resp.Body.Close() }()
+
+	var rel struct {
+		TagName string `json:"tag_name"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&rel); err != nil {
+		return "", false
+	}
+	return rel.TagName, rel.TagName != "" && rel.TagName != version
+}
+
 func run(source, outputFile string, noTUI bool) error {
+	updateCh := make(chan string, 1)
+	if version != "dev" {
+		go func() {
+			if latest, ok := fetchLatestVersion(5 * time.Second); ok {
+				updateCh <- latest
+			}
+		}()
+	}
+
 	if strings.HasPrefix(source, "http") {
 		fmt.Fprintf(os.Stderr, "Fetching %s...\n", source)
 	} else {
@@ -65,6 +114,13 @@ func run(source, outputFile string, noTUI bool) error {
 	f, err := loadFeed(source)
 	if err != nil {
 		return fmt.Errorf("load feed: %w", err)
+	}
+
+	select {
+	case latest := <-updateCh:
+		fmt.Fprintf(os.Stderr, "\n  Update available: %s → %s\n", version, latest)
+		fmt.Fprintf(os.Stderr, "  go install github.com/johlun99/merchant-analyzer/cmd/merchant-analyzer@latest\n\n")
+	default:
 	}
 
 	checkers := []checker.Checker{
