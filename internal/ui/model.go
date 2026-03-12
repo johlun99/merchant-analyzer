@@ -43,11 +43,10 @@ type clearExportMsgMsg struct{}
 
 // Model is the root Bubbletea model.
 type Model struct {
-	feed       *feed.Feed
-	checkers   []checker.Checker
-	cancel     context.CancelFunc
-	program    *tea.Program
-	outputFile string
+	feed     *feed.Feed
+	checkers []checker.Checker
+	cancel   context.CancelFunc
+	program  *tea.Program
 
 	state   viewState
 	loading views.LoadingView
@@ -63,7 +62,7 @@ type Model struct {
 }
 
 // New creates a new Model.
-func New(f *feed.Feed, checkers []checker.Checker, outputFile string) *Model {
+func New(f *feed.Feed, checkers []checker.Checker) *Model {
 	names := make([]string, len(checkers))
 	for i, c := range checkers {
 		names[i] = c.Name()
@@ -73,7 +72,6 @@ func New(f *feed.Feed, checkers []checker.Checker, outputFile string) *Model {
 		checkers:    checkers,
 		loading:     views.NewLoadingView(f.URL, names),
 		totalChecks: len(checkers),
-		outputFile:  outputFile,
 	}
 }
 
@@ -226,9 +224,6 @@ func (m *Model) transitionToReport() tea.Cmd {
 	rv := views.NewReportView(m.feed, m.results, m.width, m.height)
 	m.report = &rv
 	m.state = viewReport
-	if m.outputFile != "" {
-		return m.doExport(m.outputFile)
-	}
 	return nil
 }
 

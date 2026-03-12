@@ -19,6 +19,7 @@ import (
 	"github.com/johlun99/merchant-analyzer/internal/exporter"
 	"github.com/johlun99/merchant-analyzer/internal/feed"
 	"github.com/johlun99/merchant-analyzer/internal/ui"
+	"github.com/johlun99/merchant-analyzer/internal/ui/views"
 )
 
 func main() {
@@ -73,15 +74,15 @@ func run(source, outputFile string, noTUI bool) error {
 		aireadiness.NewChecker(),
 	}
 
-	if noTUI {
+	if noTUI || outputFile != "" {
 		return runNoTUI(f, checkers, outputFile)
 	}
 
-	return runTUI(f, checkers, outputFile)
+	return runTUI(f, checkers)
 }
 
-func runTUI(f *feed.Feed, checkers []checker.Checker, outputFile string) error {
-	m := ui.New(f, checkers, outputFile)
+func runTUI(f *feed.Feed, checkers []checker.Checker) error {
+	m := ui.New(f, checkers)
 	p := tea.NewProgram(m, tea.WithAltScreen())
 	m.SetProgram(p)
 
@@ -120,13 +121,7 @@ func runNoTUI(f *feed.Feed, checkers []checker.Checker, outputFile string) error
 	fmt.Println()
 
 	if outputFile != "" {
-		report := exporter.Report{
-			URL:          f.URL,
-			FetchTime:    f.FetchTime,
-			Size:         f.Size,
-			ProductCount: f.ProductCount,
-			Results:      results,
-		}
+		report := views.BuildReport(f, results)
 		if err := writeExport(report, outputFile); err != nil {
 			return fmt.Errorf("export: %w", err)
 		}
