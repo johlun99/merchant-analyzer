@@ -64,11 +64,11 @@ func run(url, outputFile string, noTUI bool) error {
 		return runNoTUI(f, checkers, outputFile)
 	}
 
-	return runTUI(f, checkers)
+	return runTUI(f, checkers, outputFile)
 }
 
-func runTUI(f *feed.Feed, checkers []checker.Checker) error {
-	m := ui.New(f, checkers)
+func runTUI(f *feed.Feed, checkers []checker.Checker, outputFile string) error {
+	m := ui.New(f, checkers, outputFile)
 	p := tea.NewProgram(m, tea.WithAltScreen())
 	m.SetProgram(p)
 
