@@ -11,5 +11,8 @@ dist/
 # Claude Code session data
 .claude/
 
+# Design docs / specs (local planning only)
+docs/
+
 # OS
 .DS_Store
