@@ -34,9 +34,10 @@ type jsonResult struct {
 }
 
 type jsonItem struct {
-	Field   string `json:"field"`
-	Message string `json:"message"`
-	Count   int    `json:"count,omitempty"`
+	Field    string   `json:"field"`
+	Message  string   `json:"message"`
+	Count    int      `json:"count,omitempty"`
+	Examples []string `json:"examples,omitempty"`
 }
 
 // ToJSON serializes a Report to JSON bytes.
@@ -56,9 +57,10 @@ func ToJSON(r Report) ([]byte, error) {
 		}
 		for _, item := range res.Items {
 			jr2.Items = append(jr2.Items, jsonItem{
-				Field:   item.Field,
-				Message: item.Message,
-				Count:   item.Count,
+				Field:    item.Field,
+				Message:  item.Message,
+				Count:    item.Count,
+				Examples: item.Examples,
 			})
 		}
 		jr.Results = append(jr.Results, jr2)

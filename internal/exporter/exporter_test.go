@@ -102,3 +102,85 @@ func TestMarkdownExportContainsMetrics(t *testing.T) {
 		t.Error("Markdown should contain product count")
 	}
 }
+
+func reportWithExamples() exporter.Report {
+	return exporter.Report{
+		URL:          "https://example.com/feed.xml",
+		FetchTime:    500 * time.Millisecond,
+		Size:         1024,
+		ProductCount: 10,
+		Results: []checker.Result{
+			{
+				Name:   "Google Feed Spec",
+				Status: checker.StatusError,
+				Items: []checker.Item{
+					{
+						Field:    "price",
+						Message:  "2 of 10 products missing required field \"price\"",
+						Count:    2,
+						Examples: []string{`prod-001 "Blue Shoes" — price: (missing)`, `prod-002 "Red Shoes" — price: (missing)`},
+					},
+				},
+			},
+		},
+	}
+}
+
+func TestMarkdownExportContainsExamplesSection(t *testing.T) {
+	md := exporter.ToMarkdown(reportWithExamples())
+	if !strings.Contains(md, "## Examples") {
+		t.Error("Markdown missing \"## Examples\" section")
+	}
+}
+
+func TestMarkdownExportExamplesSectionContainsCheckerName(t *testing.T) {
+	md := exporter.ToMarkdown(reportWithExamples())
+	if !strings.Contains(md, "Google Feed Spec") {
+		t.Error("Examples section should contain checker name")
+	}
+}
+
+func TestMarkdownExportExamplesSectionContainsFieldHeader(t *testing.T) {
+	md := exporter.ToMarkdown(reportWithExamples())
+	if !strings.Contains(md, "**price**") {
+		t.Error("Examples section should contain bold field header")
+	}
+}
+
+func TestMarkdownExportExamplesSectionContainsBullets(t *testing.T) {
+	md := exporter.ToMarkdown(reportWithExamples())
+	if !strings.Contains(md, `- prod-001 "Blue Shoes" — price: (missing)`) {
+		t.Error("Examples section should contain example bullets")
+	}
+}
+
+func TestMarkdownExportNoExamplesSectionWhenNone(t *testing.T) {
+	md := exporter.ToMarkdown(sampleReport())
+	if strings.Contains(md, "## Examples") {
+		t.Error("Markdown should not contain Examples section when no examples exist")
+	}
+}
+
+func TestJSONExportContainsExamples(t *testing.T) {
+	data, err := exporter.ToJSON(reportWithExamples())
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	body := string(data)
+	if !strings.Contains(body, `"examples"`) {
+		t.Error("JSON missing \"examples\" field")
+	}
+	if !strings.Contains(body, "Blue Shoes") {
+		t.Error("JSON examples missing expected content")
+	}
+}
+
+func TestJSONExportNoExamplesKeyWhenNone(t *testing.T) {
+	data, err := exporter.ToJSON(sampleReport())
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if strings.Contains(string(data), `"examples"`) {
+		t.Error("JSON should omit \"examples\" key when empty")
+	}
+}

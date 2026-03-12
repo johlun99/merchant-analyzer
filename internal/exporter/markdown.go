@@ -41,6 +41,44 @@ func ToMarkdown(r Report) string {
 		fmt.Fprintln(&b)
 	}
 
+	b.WriteString(renderExamples(r.Results))
+
+	return b.String()
+}
+
+// renderExamples returns a Markdown "## Examples" section, or "" if none exist.
+func renderExamples(results []checker.Result) string {
+	hasExamples := false
+	for _, res := range results {
+		for _, item := range res.Items {
+			if len(item.Examples) > 0 {
+				hasExamples = true
+			}
+		}
+	}
+	if !hasExamples {
+		return ""
+	}
+
+	var b strings.Builder
+	fmt.Fprintf(&b, "## Examples\n\n")
+	for _, res := range results {
+		sectionPrinted := false
+		for _, item := range res.Items {
+			if len(item.Examples) == 0 {
+				continue
+			}
+			if !sectionPrinted {
+				fmt.Fprintf(&b, "### %s\n\n", res.Name)
+				sectionPrinted = true
+			}
+			fmt.Fprintf(&b, "**%s**\n\n", item.Field)
+			for _, ex := range item.Examples {
+				fmt.Fprintf(&b, "- %s\n", ex)
+			}
+			fmt.Fprintln(&b)
+		}
+	}
 	return b.String()
 }
 
