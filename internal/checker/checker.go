@@ -18,20 +18,28 @@ const (
 	StatusFatal                 // checker could not run
 )
 
+// SubScore is a named score component (0–100).
+type SubScore struct {
+	Label string
+	Score int
+}
+
 // Item is a single finding from a checker.
 type Item struct {
-	Field   string
-	Message string
-	Count   int // number of products affected
+	Field    string
+	Message  string
+	Count    int      // number of products affected
+	Examples []string // up to 10 affected product descriptions; nil for non-googlespec checkers
 }
 
 // Result is the outcome of running a single checker.
 type Result struct {
-	Name   string
-	Status Status
-	Items  []Item
-	Score  *int  // optional 0–100 score
-	Err    error // set when Status == StatusFatal
+	Name      string
+	Status    Status
+	Items     []Item
+	Score     *int       // optional 0–100 score
+	SubScores []SubScore // optional named sub-scores; for Google Spec: Required, Recommended, Format
+	Err       error      // set when Status == StatusFatal
 }
 
 // Checker analyzes a feed and returns a Result.
