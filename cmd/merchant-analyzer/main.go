@@ -32,9 +32,9 @@ func rootCmd() *cobra.Command {
 	var noTUI bool
 
 	cmd := &cobra.Command{
-		Use:   "merchant-analyzer <url>",
+		Use:   "merchant-analyzer <url|file>",
 		Short: "Analyze a merchant product feed",
-		Long:  "Fetch and analyze a merchant feed URL, checking XML quality, attribute coverage, and AI readiness.",
+		Long:  "Fetch and analyze a merchant feed URL or local file, checking XML quality, attribute coverage, and AI readiness.",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(_ *cobra.Command, args []string) error {
 			return run(args[0], outputFile, noTUI)
@@ -47,12 +47,23 @@ func rootCmd() *cobra.Command {
 	return cmd
 }
 
-func run(url, outputFile string, noTUI bool) error {
-	fmt.Fprintf(os.Stderr, "Fetching %s...\n", url)
+func loadFeed(source string) (*feed.Feed, error) {
+	if strings.HasPrefix(source, "http://") || strings.HasPrefix(source, "https://") {
+		return feed.Fetch(source)
+	}
+	return feed.FromFile(source)
+}
 
-	f, err := feed.Fetch(url)
+func run(source, outputFile string, noTUI bool) error {
+	if strings.HasPrefix(source, "http") {
+		fmt.Fprintf(os.Stderr, "Fetching %s...\n", source)
+	} else {
+		fmt.Fprintf(os.Stderr, "Reading %s...\n", source)
+	}
+
+	f, err := loadFeed(source)
 	if err != nil {
-		return fmt.Errorf("fetch feed: %w", err)
+		return fmt.Errorf("load feed: %w", err)
 	}
 
 	checkers := []checker.Checker{

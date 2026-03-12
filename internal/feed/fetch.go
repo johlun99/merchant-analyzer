@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"os"
 	"time"
 )
 
@@ -36,6 +37,26 @@ func Fetch(url string) (*Feed, error) {
 	f.URL = url
 	f.Size = int64(len(data))
 	f.FetchTime = elapsed
+	f.Raw = data
+
+	return f, nil
+}
+
+// FromFile reads a local XML feed file, parses it, and returns a Feed.
+// FetchTime is zero since no network request is made.
+func FromFile(path string) (*Feed, error) {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return nil, fmt.Errorf("read file: %w", err)
+	}
+
+	f, err := Parse(data)
+	if err != nil {
+		return nil, fmt.Errorf("parse feed: %w", err)
+	}
+
+	f.URL = path
+	f.Size = int64(len(data))
 	f.Raw = data
 
 	return f, nil

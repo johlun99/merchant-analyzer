@@ -75,3 +75,36 @@ func TestFetchErrorOnInvalidURL(t *testing.T) {
 		t.Error("expected error for invalid URL, got nil")
 	}
 }
+
+func TestFromFileReturnsContent(t *testing.T) {
+	path := "../../testdata/valid_feed.xml"
+	info, err := os.Stat(path)
+	if err != nil {
+		t.Fatalf("stat fixture: %v", err)
+	}
+
+	result, err := feed.FromFile(path)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if result.URL != path {
+		t.Errorf("URL = %q, want %q", result.URL, path)
+	}
+	if result.Size != info.Size() {
+		t.Errorf("Size = %d, want %d", result.Size, info.Size())
+	}
+	if result.FetchTime != 0 {
+		t.Errorf("FetchTime = %v, want 0 for file input", result.FetchTime)
+	}
+	if result.ProductCount == 0 {
+		t.Error("ProductCount should be > 0 for valid feed")
+	}
+}
+
+func TestFromFileErrorOnMissingFile(t *testing.T) {
+	_, err := feed.FromFile("/nonexistent/path/feed.xml")
+	if err == nil {
+		t.Error("expected error for missing file, got nil")
+	}
+}
