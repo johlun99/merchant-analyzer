@@ -6,16 +6,21 @@ A CLI tool that analyzes merchant product feeds (XML/RSS) and reports on feed qu
 
 - **XML Validation** — checks for well-formed, complete XML
 - **Attribute Check** — validates required Google Shopping fields
-- **AI Readiness** — scores feed against Google UCP, LLM attributes, and image quality
+- **Google Feed Spec** — weighted score across required, recommended, and format rules with per-product examples
+- **AI Readiness** — scores feed against Google UCP, LLM attributes, and image quality; findings ordered by impact (High → Medium → Low)
+- **Attributes** — all feed attributes grouped by priority (Required → Recommended → Supported → Custom) with coverage %
 - **Metrics** — feed size, fetch time, product count
 - **Interactive TUI** — live Bubbletea interface with tabbed report
-- **Export** — JSON and Markdown reports
+- **Export** — JSON and Markdown reports including examples and attribute groups
 
 ## Usage
 
 ```bash
-# Interactive TUI
+# Interactive TUI — remote URL
 merchant-analyzer "https://example.com/feed.xml?locale=en"
+
+# Interactive TUI — local file
+merchant-analyzer /path/to/feed.xml
 
 # Export report
 merchant-analyzer "https://example.com/feed.xml" --output report.json
@@ -25,7 +30,7 @@ merchant-analyzer "https://example.com/feed.xml" --output report.md
 merchant-analyzer "https://example.com/feed.xml" --no-tui
 ```
 
-> **Note:** Always quote the URL if it contains query parameters (e.g. `?key=value&other=value`). Without quotes the shell interprets `&` as a background operator and splits the command.
+> **Note:** Always quote URLs that contain query parameters (e.g. `?key=value&other=value`). Without quotes the shell interprets `&` as a background operator and splits the command.
 
 ## Installation
 
