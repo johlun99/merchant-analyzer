@@ -390,7 +390,7 @@ func renderGroupDivider(label string, width int) string {
 func buildAttributeGroups(f *feed.Feed) []exporter.AttributeGroup {
 	coverage := collectAttrCoverage(f)
 	total := len(f.Products)
-	order := []string{"Required", "Recommended", "AI", "Supported", "Custom"}
+	order := []string{"Required", "Recommended", "Supported", "Custom"}
 	groups := make(map[string]*exporter.AttributeGroup, len(order))
 	for _, cat := range order {
 		groups[cat] = &exporter.AttributeGroup{Category: cat}
@@ -425,8 +425,6 @@ func primaryCategory(meta attrMeta, isCustom bool) string {
 		return "Required"
 	case meta.GoogleRecommended:
 		return "Recommended"
-	case meta.AIReady:
-		return "AI"
 	case meta.GoogleSupported:
 		return "Supported"
 	default:

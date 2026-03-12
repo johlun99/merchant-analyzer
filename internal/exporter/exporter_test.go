@@ -195,7 +195,6 @@ func reportWithAttributes() exporter.Report {
 					{Name: "brand", Tags: []string{"Recommended", "AI"}, Coverage: 80},
 				},
 			},
-			{Category: "AI", Items: nil},
 			{Category: "Supported", Items: nil},
 			{
 				Category: "Custom",
@@ -262,10 +261,7 @@ func TestAttributeGroupsInMarkdown(t *testing.T) {
 
 func TestAttributeGroupsEmptyCategoryOmittedMarkdown(t *testing.T) {
 	md := exporter.ToMarkdown(reportWithAttributes())
-	// "AI" and "Supported" have no items — their headers should not appear
-	if strings.Contains(md, "### AI\n") {
-		t.Error("Markdown should omit empty AI group")
-	}
+	// "Supported" has no items — its header should not appear
 	if strings.Contains(md, "### Supported\n") {
 		t.Error("Markdown should omit empty Supported group")
 	}
