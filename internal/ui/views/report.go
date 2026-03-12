@@ -18,11 +18,12 @@ const (
 	TabOverview = iota
 	TabXML
 	TabChecks
+	TabGoogleSpec
 	TabAI
 	TabCount
 )
 
-var tabNames = [TabCount]string{"Overview", "XML", "Checks", "AI Score"}
+var tabNames = [TabCount]string{"Overview", "XML", "Checks", "Google Spec", "AI Score"}
 
 // ReportView renders the tabbed report and export overlay.
 type ReportView struct {
@@ -174,6 +175,8 @@ func (v *ReportView) refreshViewport() {
 		v.Viewport.SetContent(v.renderCheckerTab("XML Validation"))
 	case TabChecks:
 		v.Viewport.SetContent(v.renderCheckerTab("Attribute Check"))
+	case TabGoogleSpec:
+		v.Viewport.SetContent(v.renderCheckerTab("Google Feed Spec"))
 	case TabAI:
 		v.Viewport.SetContent(v.renderAITab())
 	}
