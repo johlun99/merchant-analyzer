@@ -1,0 +1,67 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Generate release notes
+        run: |
+          CURRENT_TAG="${{ github.ref_name }}"
+          PREV_TAG=$(git tag --sort=-version:refname | grep -v "^${CURRENT_TAG}$" | head -1)
+
+          if [ -n "$PREV_TAG" ]; then
+            RANGE="${PREV_TAG}..HEAD"
+          else
+            RANGE="HEAD"
+          fi
+
+          > release_notes.md
+
+          add_section() {
+            local prefix="$1"
+            local title="$2"
+            local lines
+            lines=$(git log "$RANGE" --pretty=format:"%s" | grep -E "^${prefix}(\(.+\))?: " | sed -E "s/^${prefix}(\(.+\))?: //")
+            if [ -n "$lines" ]; then
+              printf "### %s\n\n" "$title" >> release_notes.md
+              echo "$lines" | while IFS= read -r line; do
+                printf -- "- %s\n" "$line" >> release_notes.md
+              done
+              printf "\n" >> release_notes.md
+            fi
+          }
+
+          add_section "feat"     "✨ New Features"
+          add_section "fix"      "🐛 Bug Fixes"
+          add_section "docs"     "📚 Documentation"
+          add_section "refactor" "♻️ Refactoring"
+          add_section "test"     "🧪 Tests"
+          add_section "chore"    "🔧 Maintenance"
+          add_section "perf"     "⚡ Performance"
+
+          if [ ! -s release_notes.md ]; then
+            echo "No categorized changes." > release_notes.md
+          fi
+
+          if [ -n "$PREV_TAG" ]; then
+            printf "\n**Full changelog:** \`%s...%s\`\n" "$PREV_TAG" "$CURRENT_TAG" >> release_notes.md
+          fi
+
+      - name: Create GitHub release
+        run: |
+          gh release create "${{ github.ref_name }}" \
+            --title "${{ github.ref_name }}" \
+            --notes-file release_notes.md
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
