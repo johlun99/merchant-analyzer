@@ -14,6 +14,7 @@ import (
 	"github.com/johlun99/merchant-analyzer/internal/checker"
 	"github.com/johlun99/merchant-analyzer/internal/checkers/aireadiness"
 	"github.com/johlun99/merchant-analyzer/internal/checkers/attributes"
+	googlespec "github.com/johlun99/merchant-analyzer/internal/checkers/googlespec"
 	xmlchecker "github.com/johlun99/merchant-analyzer/internal/checkers/xml"
 	"github.com/johlun99/merchant-analyzer/internal/exporter"
 	"github.com/johlun99/merchant-analyzer/internal/feed"
@@ -57,6 +58,7 @@ func run(url, outputFile string, noTUI bool) error {
 	checkers := []checker.Checker{
 		xmlchecker.NewChecker(),
 		attributes.NewChecker(),
+		googlespec.NewChecker(),
 		aireadiness.NewChecker(),
 	}
 
