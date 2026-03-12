@@ -66,6 +66,22 @@ func (c *Checker) Run(_ context.Context, f *feed.Feed) checker.Result {
 	}
 }
 
+// collectAIExamples returns up to limit example strings for products where failing returns true.
+// label(p) produces the per-product description suffix, e.g. "color: (missing)".
+func collectAIExamples(products []feed.Product, failing func(*feed.Product) bool, label func(*feed.Product) string, limit int) []string {
+	var examples []string
+	for i := range products {
+		if len(examples) >= limit {
+			break
+		}
+		p := &products[i]
+		if failing(p) {
+			examples = append(examples, fmt.Sprintf("%s %q — %s", p.ID, p.Title, label(p)))
+		}
+	}
+	return examples
+}
+
 // computeUCPScore returns the UCP sub-score (max 40) and findings.
 func computeUCPScore(products []feed.Product) (float64, []checker.Item) {
 	ucpFields := []struct {
@@ -104,10 +120,12 @@ func computeUCPScore(products []feed.Product) (float64, []checker.Item) {
 		sumCoverage += coverage
 		if coverage < 1.0 {
 			missing := total - present
+			fieldName := f.name
 			items = append(items, checker.Item{
-				Field:   f.name,
-				Message: fmt.Sprintf("UCP: %d of %d products missing %q", missing, total, f.name),
-				Count:   missing,
+				Field:    fieldName,
+				Message:  fmt.Sprintf("UCP: %d of %d products missing %q", missing, total, fieldName),
+				Count:    missing,
+				Examples: collectAIExamples(products, func(p *feed.Product) bool { return f.get(p) == "" }, func(_ *feed.Product) string { return fieldName + ": (missing)" }, 10),
 			})
 		}
 	}
@@ -119,15 +137,26 @@ func computeUCPScore(products []feed.Product) (float64, []checker.Item) {
 // computeLLMScore returns the LLM sub-score (max 35) and findings.
 func computeLLMScore(products []feed.Product) (float64, []checker.Item) {
 	type llmCheck struct {
-		name string
-		pass func(*feed.Product) bool
+		name  string
+		pass  func(*feed.Product) bool
+		label func(*feed.Product) string
 	}
 
 	checks := []llmCheck{
-		{"color", func(p *feed.Product) bool { return p.Color != "" }},
-		{"size", func(p *feed.Product) bool { return p.Size != "" }},
-		{"material", func(p *feed.Product) bool { return p.Material != "" }},
-		{"description_length", func(p *feed.Product) bool { return len(p.Description) > minDescriptionLen }},
+		{"color",
+			func(p *feed.Product) bool { return p.Color != "" },
+			func(_ *feed.Product) string { return "color: (missing)" }},
+		{"size",
+			func(p *feed.Product) bool { return p.Size != "" },
+			func(_ *feed.Product) string { return "size: (missing)" }},
+		{"material",
+			func(p *feed.Product) bool { return p.Material != "" },
+			func(_ *feed.Product) string { return "material: (missing)" }},
+		{"description_length",
+			func(p *feed.Product) bool { return len(p.Description) > minDescriptionLen },
+			func(p *feed.Product) string {
+				return fmt.Sprintf("description: %d chars (need >%d)", len(p.Description), minDescriptionLen)
+			}},
 	}
 
 	total := len(products)
@@ -146,9 +175,10 @@ func computeLLMScore(products []feed.Product) (float64, []checker.Item) {
 		if coverage < 1.0 {
 			missing := total - passing
 			items = append(items, checker.Item{
-				Field:   ch.name,
-				Message: fmt.Sprintf("LLM: %d of %d products missing %q", missing, total, ch.name),
-				Count:   missing,
+				Field:    ch.name,
+				Message:  fmt.Sprintf("LLM: %d of %d products missing %q", missing, total, ch.name),
+				Count:    missing,
+				Examples: collectAIExamples(products, func(p *feed.Product) bool { return !ch.pass(p) }, ch.label, 10),
 			})
 		}
 	}
@@ -180,17 +210,19 @@ func computeImageScore(products []feed.Product) (float64, []checker.Item) {
 	if imageCoverage < 1.0 {
 		missing := total - withImage
 		items = append(items, checker.Item{
-			Field:   "image_link",
-			Message: fmt.Sprintf("Image: %d of %d products missing image_link", missing, total),
-			Count:   missing,
+			Field:    "image_link",
+			Message:  fmt.Sprintf("Image: %d of %d products missing image_link", missing, total),
+			Count:    missing,
+			Examples: collectAIExamples(products, func(p *feed.Product) bool { return p.ImageLink == "" }, func(_ *feed.Product) string { return "image_link: (missing)" }, 10),
 		})
 	}
 	if additionalCoverage < 1.0 {
 		missing := total - withAdditional
 		items = append(items, checker.Item{
-			Field:   "additional_image_link",
-			Message: fmt.Sprintf("Image: %d of %d products missing additional_image_link", missing, total),
-			Count:   missing,
+			Field:    "additional_image_link",
+			Message:  fmt.Sprintf("Image: %d of %d products missing additional_image_link", missing, total),
+			Count:    missing,
+			Examples: collectAIExamples(products, func(p *feed.Product) bool { return len(p.AdditionalImages) == 0 }, func(_ *feed.Product) string { return "additional_image_link: (missing)" }, 10),
 		})
 	}
 

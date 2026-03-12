@@ -293,6 +293,9 @@ func (v ReportView) renderAITab() string {
 			bullet := styles.StyleMetricLabel.Render("  •")
 			field := lipgloss.NewStyle().Bold(true).Render(item.Field)
 			fmt.Fprintf(&b, "%s %s: %s\n", bullet, field, item.Message)
+			for _, ex := range item.Examples {
+				fmt.Fprintf(&b, "    %s\n", styles.StyleMetricLabel.Render(ex))
+			}
 		}
 	}
 	return b.String()

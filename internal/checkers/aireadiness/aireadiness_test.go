@@ -2,7 +2,9 @@ package aireadiness_test
 
 import (
 	"context"
+	"fmt"
 	"os"
+	"strings"
 	"testing"
 
 	"github.com/johlun99/merchant-analyzer/internal/checker"
@@ -104,6 +106,75 @@ func TestAIReadinessCheckerStatusReflectsScore(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestAIReadinessUCPExamplesPopulated(t *testing.T) {
+	products := []feed.Product{
+		{ID: "p1", Title: "Shirt", Description: "A shirt.", Price: "10", Availability: "in stock",
+			Link: "https://x.com", ImageLink: "https://x.com/img.jpg", Condition: "new"},
+		// brand and gtin_or_mpn missing → UCP items should have examples
+	}
+	f := &feed.Feed{Products: products, ProductCount: 1}
+	result := aireadiness.NewChecker().Run(context.Background(), f)
+
+	for _, item := range result.Items {
+		if item.Field == "brand" {
+			if len(item.Examples) == 0 {
+				t.Error("expected examples for brand UCP violation, got none")
+			}
+			return
+		}
+	}
+	t.Error("expected item for field \"brand\"")
+}
+
+func TestAIReadinessLLMExamplesShowDescriptionLength(t *testing.T) {
+	products := []feed.Product{
+		{ID: "p1", Title: "Shirt", Description: "Short.", Price: "10", Availability: "in stock",
+			Link: "https://x.com", ImageLink: "https://x.com/img.jpg"},
+	}
+	f := &feed.Feed{Products: products, ProductCount: 1}
+	result := aireadiness.NewChecker().Run(context.Background(), f)
+
+	for _, item := range result.Items {
+		if item.Field == "description_length" {
+			if len(item.Examples) == 0 {
+				t.Fatal("expected examples for description_length violation, got none")
+			}
+			ex := item.Examples[0]
+			if !strings.Contains(ex, "chars") {
+				t.Errorf("expected example to contain char count, got %q", ex)
+			}
+			return
+		}
+	}
+	t.Error("expected item for field \"description_length\"")
+}
+
+func TestAIReadinessExamplesCappedAt10(t *testing.T) {
+	products := make([]feed.Product, 15)
+	for i := range products {
+		products[i] = feed.Product{
+			ID: fmt.Sprintf("p%d", i+1), Title: "Shirt", Description: "desc",
+			Price: "10", Availability: "in stock", Link: "https://x.com", ImageLink: "https://x.com/img.jpg",
+			// no color → LLM color violation for all 15
+		}
+	}
+	f := &feed.Feed{Products: products, ProductCount: len(products)}
+	result := aireadiness.NewChecker().Run(context.Background(), f)
+
+	for _, item := range result.Items {
+		if item.Field == "color" {
+			if len(item.Examples) == 0 {
+				t.Error("expected examples, got none")
+			}
+			if len(item.Examples) > 10 {
+				t.Errorf("examples capped at 10, got %d", len(item.Examples))
+			}
+			return
+		}
+	}
+	t.Error("expected item for field \"color\"")
 }
 
 func TestAIReadinessCheckerScoringFormula(t *testing.T) {
