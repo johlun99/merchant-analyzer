@@ -532,7 +532,7 @@ func TestGoogleSpecExamplesShowMissingLabel(t *testing.T) {
 
 func TestGoogleSpecScoreIsWeightedAverage(t *testing.T) {
 	// All required present (reqScore=100), no recommended (recScore=0), no format violations (fmtScore=100).
-	// weighted = (100*6 + 0*3 + 100 + 5) / 10 = 705/10 = 70
+	// weighted = (100*6 + 0*3 + 100) / 10 = 700/10 = 70
 	f := feedFromItem(t, `
       <g:id>prod-001</g:id>
       <g:title>Blue Running Shoes</g:title>
@@ -547,6 +547,42 @@ func TestGoogleSpecScoreIsWeightedAverage(t *testing.T) {
 	}
 	if *r.Score != 70 {
 		t.Errorf("Score = %d, want 70 (weighted average)", *r.Score)
+	}
+}
+
+func TestGoogleSpecScoreNot100WhenMinorViolation(t *testing.T) {
+	// 100 products: 99 have all fields including brand, 1 is missing brand.
+	// recScore = 99, reqScore = 100, fmtScore = 100.
+	// Weighted = (100*6 + 99*3 + 100) / 10 = 997/10 = 99.
+	// The score must not inflate to 100 via rounding.
+	const base = `
+      <g:id>%s</g:id>
+      <g:title>Product</g:title>
+      <g:description>A great pair of running shoes for all terrain use.</g:description>
+      <g:price>89.99 SEK</g:price>
+      <g:availability>in stock</g:availability>
+      <g:link>https://example.com/p</g:link>
+      <g:image_link>https://example.com/img.jpg</g:image_link>
+      <g:google_product_category>Shoes</g:google_product_category>
+      <g:mpn>RUN-001</g:mpn>
+      <g:additional_image_link>https://example.com/img2.jpg</g:additional_image_link>
+      <g:product_type>Footwear</g:product_type>`
+	items := make([]string, 100)
+	for i := range items {
+		id := fmt.Sprintf("p%03d", i)
+		if i == 0 {
+			items[i] = fmt.Sprintf(base, id) // no brand → recommended violation
+		} else {
+			items[i] = fmt.Sprintf(base+"\n      <g:brand>B</g:brand>", id)
+		}
+	}
+	f := feedFromItems(t, items)
+	r := runChecker(t, f)
+	if r.Score == nil {
+		t.Fatal("Score should not be nil")
+	}
+	if *r.Score >= 100 {
+		t.Errorf("Score = %d, want < 100 when violations exist (minor violation must not inflate to 100)", *r.Score)
 	}
 }
 

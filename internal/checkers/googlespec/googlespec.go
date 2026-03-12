@@ -66,7 +66,7 @@ func (c *Checker) Run(_ context.Context, f *feed.Feed) checker.Result {
 		Name:   c.Name(),
 		Status: status,
 		Items:  items,
-		Score:  checker.ScoreOf((reqScore*6 + recScore*3 + fmtScore + 5) / 10),
+		Score:  checker.ScoreOf((reqScore*6 + recScore*3 + fmtScore) / 10),
 		SubScores: []checker.SubScore{
 			{Label: "Required", Score: reqScore},
 			{Label: "Recommended", Score: recScore},
