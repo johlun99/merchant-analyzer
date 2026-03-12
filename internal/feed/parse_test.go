@@ -2,6 +2,7 @@ package feed_test
 
 import (
 	"os"
+	"strings"
 	"testing"
 
 	"github.com/johlun99/merchant-analyzer/internal/feed"
@@ -103,6 +104,20 @@ func TestParseBrokenFeedIsIncomplete(t *testing.T) {
 	_, err := feed.Parse(readFixture(t, "broken_feed.xml"))
 	if err == nil {
 		t.Error("expected error for truncated feed, got nil")
+	}
+}
+
+func TestParseNonXMLReturnsXMLError(t *testing.T) {
+	// If the response body is HTML or JSON (e.g. an API error page),
+	// Parse should return the actual XML decode error, not a generic
+	// "root element was not closed" message.
+	htmlData := []byte(`<!DOCTYPE html><html><body><h1>Not Found</h1></body></html>`)
+	_, err := feed.Parse(htmlData)
+	if err == nil {
+		t.Fatal("expected error for non-XML input, got nil")
+	}
+	if strings.Contains(err.Error(), "root element was not closed") {
+		t.Errorf("expected XML decode error, got misleading message: %v", err)
 	}
 }
 

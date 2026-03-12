@@ -3,7 +3,9 @@ package feed
 
 import (
 	"encoding/xml"
+	"errors"
 	"fmt"
+	"io"
 	"strings"
 )
 
@@ -16,15 +18,22 @@ func Parse(data []byte) (*Feed, error) {
 	var current *Product
 	var currentField string
 	rootClosed := false
+	rootSeen := false
 
 	for {
 		tok, err := dec.Token()
 		if err != nil {
+			if !errors.Is(err, io.EOF) {
+				return nil, fmt.Errorf("decode xml: %w", err)
+			}
 			break
 		}
-		rootClosed, current, currentField = handleToken(tok, rootClosed, &products, current, currentField)
+		rootClosed, rootSeen, current, currentField = handleToken(tok, rootClosed, rootSeen, &products, current, currentField)
 	}
 
+	if !rootSeen {
+		return nil, fmt.Errorf("not a recognized feed format (no rss/feed root element found)")
+	}
 	if !rootClosed {
 		return nil, fmt.Errorf("feed is incomplete: root element was not closed")
 	}
@@ -38,44 +47,48 @@ func Parse(data []byte) (*Feed, error) {
 func handleToken(
 	tok xml.Token,
 	rootClosed bool,
+	rootSeen bool,
 	products *[]Product,
 	current *Product,
 	currentField string,
-) (bool, *Product, string) {
+) (bool, bool, *Product, string) {
 	switch t := tok.(type) {
 	case xml.StartElement:
-		return handleStart(t, rootClosed, products, current, currentField)
+		rc, rs, cur, cf := handleStart(t, rootClosed, rootSeen, products, current, currentField)
+		return rc, rs, cur, cf
 	case xml.EndElement:
-		return handleEnd(t, rootClosed, products, current, currentField)
+		rc, cur, cf := handleEnd(t, rootClosed, products, current, currentField)
+		return rc, rootSeen, cur, cf
 	case xml.CharData:
 		if current != nil && currentField != "" {
 			value := strings.TrimSpace(string(t))
 			setProductField(current, currentField, value)
 		}
 	}
-	return rootClosed, current, currentField
+	return rootClosed, rootSeen, current, currentField
 }
 
 func handleStart(
 	t xml.StartElement,
 	rootClosed bool,
+	rootSeen bool,
 	_ *[]Product,
 	current *Product,
 	_ string,
-) (bool, *Product, string) {
+) (bool, bool, *Product, string) {
 	local := strings.ToLower(t.Name.Local)
 
 	if local == "rss" || local == "feed" || local == "channel" {
-		return rootClosed, current, ""
+		return rootClosed, true, current, ""
 	}
 	if local == "item" || local == "entry" {
 		p := Product{Extra: make(map[string]string)}
-		return rootClosed, &p, ""
+		return rootClosed, rootSeen, &p, ""
 	}
 	if current != nil {
-		return rootClosed, current, local
+		return rootClosed, rootSeen, current, local
 	}
-	return rootClosed, current, ""
+	return rootClosed, rootSeen, current, ""
 }
 
 func handleEnd(
