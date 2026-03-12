@@ -37,7 +37,11 @@ merchant-analyzer "https://example.com/feed.xml" --no-tui
 ### Using `go install` (requires Go 1.21+)
 
 ```bash
+# Latest version
 go install github.com/johlun99/merchant-analyzer/cmd/merchant-analyzer@latest
+
+# Specific version
+go install github.com/johlun99/merchant-analyzer/cmd/merchant-analyzer@v1.2.0
 ```
 
 The binary will be placed in `$(go env GOPATH)/bin`. Make sure that directory is in your `PATH`:
