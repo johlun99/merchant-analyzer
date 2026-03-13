@@ -26,6 +26,25 @@ func (c *Checker) Name() string {
 	return "XML Validation"
 }
 
+// fieldDef pairs a required field name with its accessor function.
+type fieldDef struct {
+	name string
+	get  func(*feed.Product) string
+}
+
+// orderedFields returns the required product fields in a deterministic order.
+func orderedFields() []fieldDef {
+	return []fieldDef{
+		{"id", func(p *feed.Product) string { return p.ID }},
+		{"title", func(p *feed.Product) string { return p.Title }},
+		{"description", func(p *feed.Product) string { return p.Description }},
+		{"price", func(p *feed.Product) string { return p.Price }},
+		{"availability", func(p *feed.Product) string { return p.Availability }},
+		{"link", func(p *feed.Product) string { return p.Link }},
+		{"image_link", func(p *feed.Product) string { return p.ImageLink }},
+	}
+}
+
 // Run validates the feed's raw XML for structure and attribute quality.
 func (c *Checker) Run(_ context.Context, f *feed.Feed) checker.Result {
 	var items []checker.Item
@@ -40,30 +59,38 @@ func (c *Checker) Run(_ context.Context, f *feed.Feed) checker.Result {
 		status = checker.StatusError
 	}
 
-	// Attribute quality: check for empty required fields and excessively long values.
-	for i, p := range f.Products {
-		fields := productFields(&p)
-		for field, value := range fields {
-			if value == "" {
-				items = append(items, checker.Item{
-					Field:   field,
-					Message: fmt.Sprintf("product %d: required field %q is empty", i+1, field),
-					Count:   1,
-				})
-				if status < checker.StatusWarning {
-					status = checker.StatusWarning
-				}
-				continue
+	// Attribute quality: one Item per field, aggregating all affected products.
+	for _, fd := range orderedFields() {
+		var missing, toolong []checker.AffectedProduct
+		for _, p := range f.Products {
+			val := fd.get(&p)
+			ap := checker.AffectedProduct{ID: p.ID, Title: p.Title}
+			if val == "" {
+				missing = append(missing, ap)
+			} else if len(val) > maxValueLen {
+				toolong = append(toolong, ap)
 			}
-			if len(value) > maxValueLen {
-				items = append(items, checker.Item{
-					Field:   field,
-					Message: fmt.Sprintf("product %d: field %q exceeds %d characters (%d)", i+1, field, maxValueLen, len(value)),
-					Count:   1,
-				})
-				if status < checker.StatusWarning {
-					status = checker.StatusWarning
-				}
+		}
+		if len(missing) > 0 {
+			items = append(items, checker.Item{
+				Field:            fd.name,
+				Message:          fmt.Sprintf("%d products missing required field %q", len(missing), fd.name),
+				Count:            len(missing),
+				AffectedProducts: missing,
+			})
+			if status < checker.StatusWarning {
+				status = checker.StatusWarning
+			}
+		}
+		if len(toolong) > 0 {
+			items = append(items, checker.Item{
+				Field:            fd.name,
+				Message:          fmt.Sprintf("%d products with field %q exceeding %d characters", len(toolong), fd.name, maxValueLen),
+				Count:            len(toolong),
+				AffectedProducts: toolong,
+			})
+			if status < checker.StatusWarning {
+				status = checker.StatusWarning
 			}
 		}
 	}
@@ -108,17 +135,4 @@ func validateStructure(data []byte) error {
 		return fmt.Errorf("feed is incomplete: root element was not closed (truncated)")
 	}
 	return nil
-}
-
-// productFields returns a map of required field name → value for a product.
-func productFields(p *feed.Product) map[string]string {
-	return map[string]string{
-		"id":           p.ID,
-		"title":        p.Title,
-		"description":  p.Description,
-		"price":        p.Price,
-		"availability": p.Availability,
-		"link":         p.Link,
-		"image_link":   p.ImageLink,
-	}
 }
