@@ -24,14 +24,21 @@ type SubScore struct {
 	Score int
 }
 
+// AffectedProduct holds the ID and Title of a product that triggered a checker finding.
+type AffectedProduct struct {
+	ID    string
+	Title string
+}
+
 // Item is a single finding from a checker.
 type Item struct {
-	Field      string
-	Message    string
-	Count      int      // number of products affected
-	Examples   []string // up to 10 affected product descriptions; nil for non-googlespec checkers
-	Impact     string   // optional: "High", "Medium", or "Low"
-	ImpactDesc string   // optional: one-liner explaining why this attribute matters for AI
+	Field            string
+	Message          string
+	Count            int               // number of products affected
+	Examples         []string          // up to 10 affected product descriptions; nil for non-googlespec checkers
+	AffectedProducts []AffectedProduct // full list of affected products, no cap — for export and TUI drill-down
+	Impact           string            // optional: "High", "Medium", or "Low"
+	ImpactDesc       string            // optional: one-liner explaining why this attribute matters for AI
 }
 
 // Result is the outcome of running a single checker.
