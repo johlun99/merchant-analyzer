@@ -193,13 +193,14 @@ func (m *Model) handleReportKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 }
 
 func (m *Model) handleExportKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
-	switch msg.String() {
-	case "esc":
+	if msg.String() == "esc" {
 		m.report.CloseExport()
 		return m, nil
-	case "enter":
-		return m, m.doExport(m.report.ExportInput.Value())
 	}
+	if confirm := m.report.HandleExportToggleKey(msg.String()); confirm {
+		return m, m.doExport(m.report.ExportInput.Value(), m.report.ExportSelections())
+	}
+	// Pass through to text input only when filename row is focused.
 	return m.updateReport(msg)
 }
 
@@ -247,17 +248,44 @@ func (m *Model) transitionToReport() tea.Cmd {
 	return nil
 }
 
-func (m *Model) doExport(filename string) tea.Cmd {
+func (m *Model) doExport(filename string, sel views.ExportSelections) tea.Cmd {
 	filename = strings.TrimSpace(filename)
 	if filename == "" {
 		filename = "report.json"
 	}
 	report := views.BuildReport(m.feed, m.results)
 	return func() tea.Msg {
-		if err := writeExport(report, filename); err != nil {
-			return exportErrMsg{err: err}
+		var written []string
+		if sel.MainReport {
+			if err := writeExport(report, filename); err != nil {
+				return exportErrMsg{err: err}
+			}
+			written = append(written, filename)
 		}
-		return exportDoneMsg{path: filename}
+		base := strings.TrimSuffix(filename, filepath.Ext(filename))
+		if sel.ProductsCSV {
+			data, err := exporter.ToProductCSV(report)
+			if err != nil {
+				return exportErrMsg{err: err}
+			}
+			csvFile := base + "-products.csv"
+			if err := os.WriteFile(csvFile, data, 0o600); err != nil {
+				return exportErrMsg{err: err}
+			}
+			written = append(written, csvFile)
+		}
+		if sel.ProductsJSON {
+			data, err := exporter.ToProductJSON(report)
+			if err != nil {
+				return exportErrMsg{err: err}
+			}
+			jsonFile := base + "-products.json"
+			if err := os.WriteFile(jsonFile, data, 0o600); err != nil {
+				return exportErrMsg{err: err}
+			}
+			written = append(written, jsonFile)
+		}
+		return exportDoneMsg{path: strings.Join(written, ", ")}
 	}
 }
 
