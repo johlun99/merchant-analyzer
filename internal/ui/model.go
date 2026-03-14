@@ -161,6 +161,11 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 func (m *Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	// Drill-down intercepts ALL keys (including q/ctrl+c) while active.
+	if m.state == viewReport && m.report != nil && m.report.InDrillDown() {
+		return m.handleDrillDownKey(msg)
+	}
+
 	if msg.String() == "ctrl+c" || msg.String() == "q" {
 		if m.cancel != nil {
 			m.cancel()
@@ -173,6 +178,11 @@ func (m *Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	}
 
 	return m, nil
+}
+
+func (m *Model) handleDrillDownKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	cmd, _ := m.report.UpdateDrillDownMsg(msg)
+	return m, cmd
 }
 
 func (m *Model) handleReportKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
@@ -201,10 +211,20 @@ func (m *Model) handleNavigationKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.report.PrevTab()
 	case "e":
 		m.report.OpenExport()
+	case "enter":
+		m.report.OpenDrillDown()
 	case "up", "k":
-		m.report.Viewport.LineUp(1)
+		if views.TabSupportsCursor(m.report.ActiveTab) {
+			m.report.MoveCursorUp()
+		} else {
+			m.report.Viewport.LineUp(1)
+		}
 	case "down", "j":
-		m.report.Viewport.LineDown(1)
+		if views.TabSupportsCursor(m.report.ActiveTab) {
+			m.report.MoveCursorDown()
+		} else {
+			m.report.Viewport.LineDown(1)
+		}
 	}
 	return m, nil
 }
