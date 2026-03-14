@@ -53,6 +53,13 @@ const (
 	modeDrillDown            // showing ProductListView for a selected item
 )
 
+// ExportSelections holds the format toggles chosen in the export overlay.
+type ExportSelections struct {
+	MainReport   bool
+	ProductsCSV  bool
+	ProductsJSON bool
+}
+
 // ReportView renders the tabbed report and export overlay.
 type ReportView struct {
 	Feed         *feed.Feed
@@ -67,6 +74,12 @@ type ReportView struct {
 	Height       int
 	mode         reportMode
 	drillDown    *ProductListView
+	// export overlay toggle state
+	exportMain      bool // default true
+	exportCSV       bool // default true
+	exportJSON      bool // default false
+	exportFocusRow  int  // 0=filename, 1=main, 2=csv, 3=json
+	exportToggleErr string
 }
 
 // NewReportView creates an initialized ReportView.
@@ -87,6 +100,8 @@ func NewReportView(f *feed.Feed, results []checker.Result, width, height int) Re
 		Width:        width,
 		Height:       height,
 		SelectedItem: cursorDefault(TabOverview),
+		exportMain:   true,
+		exportCSV:    true,
 	}
 	rv.refreshViewport()
 	return rv
@@ -185,11 +200,67 @@ func checkerNameForTab(tab int) string {
 	return ""
 }
 
-// OpenExport opens the export overlay.
+// OpenExport opens the export overlay, resetting toggles to defaults.
 func (v *ReportView) OpenExport() {
 	v.ExportOpen = true
 	v.ExportInput.Focus()
 	v.ExportMsg = ""
+	v.exportMain = true
+	v.exportCSV = true
+	v.exportJSON = false
+	v.exportFocusRow = 0
+	v.exportToggleErr = ""
+}
+
+// ExportSelections returns the current toggle state of the export overlay.
+func (v *ReportView) ExportSelections() ExportSelections {
+	return ExportSelections{
+		MainReport:   v.exportMain,
+		ProductsCSV:  v.exportCSV,
+		ProductsJSON: v.exportJSON,
+	}
+}
+
+// HandleExportToggleKey processes navigation and toggle keys inside the export overlay.
+// Returns true when the caller should confirm the export (Enter with valid selection).
+func (v *ReportView) HandleExportToggleKey(key string) bool {
+	const rows = 4 // 0=filename, 1=main, 2=csv, 3=json
+	switch key {
+	case "tab", "down":
+		if v.exportFocusRow == 0 {
+			v.ExportInput.Blur()
+		}
+		v.exportFocusRow = (v.exportFocusRow + 1) % rows
+		if v.exportFocusRow == 0 {
+			v.ExportInput.Focus()
+		}
+	case "shift+tab", "up":
+		if v.exportFocusRow == 0 {
+			v.ExportInput.Blur()
+		}
+		v.exportFocusRow = (v.exportFocusRow - 1 + rows) % rows
+		if v.exportFocusRow == 0 {
+			v.ExportInput.Focus()
+		}
+	case " ":
+		switch v.exportFocusRow {
+		case 1:
+			v.exportMain = !v.exportMain
+		case 2:
+			v.exportCSV = !v.exportCSV
+		case 3:
+			v.exportJSON = !v.exportJSON
+		}
+		v.exportToggleErr = ""
+	case "enter":
+		if !v.exportMain && !v.exportCSV && !v.exportJSON {
+			v.exportToggleErr = "Select at least one export format"
+			return false
+		}
+		v.exportToggleErr = ""
+		return true
+	}
+	return false
 }
 
 // InDrillDown reports whether the drill-down product list is active.
@@ -304,7 +375,35 @@ func (v ReportView) renderExportOverlay() string {
 	var b strings.Builder
 	fmt.Fprintf(&b, "%s\n\n", styles.StyleTitle.Render("Export Report"))
 	fmt.Fprintf(&b, "Filename: %s\n\n", v.ExportInput.View())
-	fmt.Fprintf(&b, "%s", styles.StyleHelp.Render("enter confirm  esc cancel"))
+
+	// Toggle rows
+	rows := []struct {
+		label   string
+		checked bool
+		idx     int
+	}{
+		{"Main report  (.json / .md)", v.exportMain, 1},
+		{"Product list (CSV)        ", v.exportCSV, 2},
+		{"Product list (JSON)       ", v.exportJSON, 3},
+	}
+	for _, row := range rows {
+		cursor := "  "
+		if v.exportFocusRow == row.idx {
+			cursor = styles.StyleMetric.Render("> ")
+		}
+		box := "[ ]"
+		if row.checked {
+			box = styles.StyleStatusOK.Render("[x]")
+		}
+		fmt.Fprintf(&b, "%s%s %s\n", cursor, box, row.label)
+	}
+
+	if v.exportToggleErr != "" {
+		fmt.Fprintf(&b, "\n%s\n", styles.StyleStatusError.Render("  "+v.exportToggleErr))
+	} else {
+		fmt.Fprintln(&b)
+	}
+	fmt.Fprintf(&b, "%s", styles.StyleHelp.Render("enter export  ↑/↓ move  space toggle  esc cancel"))
 	return styles.StyleOverlay.Render(b.String())
 }
 
