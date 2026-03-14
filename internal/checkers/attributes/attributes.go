@@ -38,11 +38,12 @@ func (c *Checker) Run(_ context.Context, f *feed.Feed) checker.Result {
 	status := checker.StatusOK
 
 	for _, field := range requiredFields {
-		missing := countMissing(f.Products, field)
-		if missing == 0 {
+		affected := collectMissing(f.Products, field)
+		if len(affected) == 0 {
 			continue
 		}
 
+		missing := len(affected)
 		pct := float64(missing) / float64(total) * 100
 		var fieldStatus checker.Status
 		switch {
@@ -57,9 +58,10 @@ func (c *Checker) Run(_ context.Context, f *feed.Feed) checker.Result {
 		}
 
 		items = append(items, checker.Item{
-			Field:   field,
-			Message: fmt.Sprintf("%.1f%% of products missing %q (%d of %d)", pct, field, missing, total),
-			Count:   missing,
+			Field:            field,
+			Message:          fmt.Sprintf("%.1f%% of products missing %q (%d of %d)", pct, field, missing, total),
+			Count:            missing,
+			AffectedProducts: affected,
 		})
 	}
 
@@ -70,15 +72,15 @@ func (c *Checker) Run(_ context.Context, f *feed.Feed) checker.Result {
 	}
 }
 
-// countMissing returns how many products have an empty value for the given field.
-func countMissing(products []feed.Product, field string) int {
-	count := 0
+// collectMissing returns all products that have an empty value for the given field.
+func collectMissing(products []feed.Product, field string) []checker.AffectedProduct {
+	var affected []checker.AffectedProduct
 	for _, p := range products {
 		if getField(&p, field) == "" {
-			count++
+			affected = append(affected, checker.AffectedProduct{ID: p.ID, Title: p.Title})
 		}
 	}
-	return count
+	return affected
 }
 
 // getField returns the value of a named required field from a product.

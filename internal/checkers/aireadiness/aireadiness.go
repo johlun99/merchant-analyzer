@@ -118,6 +118,18 @@ func collectAIExamples(products []feed.Product, failing func(*feed.Product) bool
 	return examples
 }
 
+// collectAIAffected returns all products where failing returns true as AffectedProduct entries (no cap).
+func collectAIAffected(products []feed.Product, failing func(*feed.Product) bool) []checker.AffectedProduct {
+	var affected []checker.AffectedProduct
+	for i := range products {
+		p := &products[i]
+		if failing(p) {
+			affected = append(affected, checker.AffectedProduct{ID: p.ID, Title: p.Title})
+		}
+	}
+	return affected
+}
+
 // computeUCPScore returns the UCP sub-score (max 40) and findings.
 func computeUCPScore(products []feed.Product) (float64, []checker.Item) {
 	ucpFields := []struct {
@@ -157,14 +169,16 @@ func computeUCPScore(products []feed.Product) (float64, []checker.Item) {
 		if coverage < 1.0 {
 			missing := total - present
 			fieldName := f.name
+			failing := func(p *feed.Product) bool { return f.get(p) == "" }
 			impLvl, impDesc := impactFor(fieldName)
 			items = append(items, checker.Item{
-				Field:      fieldName,
-				Message:    fmt.Sprintf("UCP: %d of %d products missing %q", missing, total, fieldName),
-				Count:      missing,
-				Examples:   collectAIExamples(products, func(p *feed.Product) bool { return f.get(p) == "" }, func(_ *feed.Product) string { return fieldName + ": (missing)" }, 10),
-				Impact:     impLvl,
-				ImpactDesc: impDesc,
+				Field:            fieldName,
+				Message:          fmt.Sprintf("UCP: %d of %d products missing %q", missing, total, fieldName),
+				Count:            missing,
+				Examples:         collectAIExamples(products, failing, func(_ *feed.Product) string { return fieldName + ": (missing)" }, 10),
+				AffectedProducts: collectAIAffected(products, failing),
+				Impact:           impLvl,
+				ImpactDesc:       impDesc,
 			})
 		}
 	}
@@ -213,14 +227,16 @@ func computeLLMScore(products []feed.Product) (float64, []checker.Item) {
 		sumCoverage += coverage
 		if coverage < 1.0 {
 			missing := total - passing
+			failing := func(p *feed.Product) bool { return !ch.pass(p) }
 			impLvl, impDesc := impactFor(ch.name)
 			items = append(items, checker.Item{
-				Field:      ch.name,
-				Message:    fmt.Sprintf("LLM: %d of %d products missing %q", missing, total, ch.name),
-				Count:      missing,
-				Examples:   collectAIExamples(products, func(p *feed.Product) bool { return !ch.pass(p) }, ch.label, 10),
-				Impact:     impLvl,
-				ImpactDesc: impDesc,
+				Field:            ch.name,
+				Message:          fmt.Sprintf("LLM: %d of %d products missing %q", missing, total, ch.name),
+				Count:            missing,
+				Examples:         collectAIExamples(products, failing, ch.label, 10),
+				AffectedProducts: collectAIAffected(products, failing),
+				Impact:           impLvl,
+				ImpactDesc:       impDesc,
 			})
 		}
 	}
@@ -251,26 +267,30 @@ func computeImageScore(products []feed.Product) (float64, []checker.Item) {
 	var items []checker.Item
 	if imageCoverage < 1.0 {
 		missing := total - withImage
+		failing := func(p *feed.Product) bool { return p.ImageLink == "" }
 		impLvl, impDesc := impactFor("image_link")
 		items = append(items, checker.Item{
-			Field:      "image_link",
-			Message:    fmt.Sprintf("Image: %d of %d products missing image_link", missing, total),
-			Count:      missing,
-			Examples:   collectAIExamples(products, func(p *feed.Product) bool { return p.ImageLink == "" }, func(_ *feed.Product) string { return "image_link: (missing)" }, 10),
-			Impact:     impLvl,
-			ImpactDesc: impDesc,
+			Field:            "image_link",
+			Message:          fmt.Sprintf("Image: %d of %d products missing image_link", missing, total),
+			Count:            missing,
+			Examples:         collectAIExamples(products, failing, func(_ *feed.Product) string { return "image_link: (missing)" }, 10),
+			AffectedProducts: collectAIAffected(products, failing),
+			Impact:           impLvl,
+			ImpactDesc:       impDesc,
 		})
 	}
 	if additionalCoverage < 1.0 {
 		missing := total - withAdditional
+		failing := func(p *feed.Product) bool { return len(p.AdditionalImages) == 0 }
 		impLvl, impDesc := impactFor("additional_image_link")
 		items = append(items, checker.Item{
-			Field:      "additional_image_link",
-			Message:    fmt.Sprintf("Image: %d of %d products missing additional_image_link", missing, total),
-			Count:      missing,
-			Examples:   collectAIExamples(products, func(p *feed.Product) bool { return len(p.AdditionalImages) == 0 }, func(_ *feed.Product) string { return "additional_image_link: (missing)" }, 10),
-			Impact:     impLvl,
-			ImpactDesc: impDesc,
+			Field:            "additional_image_link",
+			Message:          fmt.Sprintf("Image: %d of %d products missing additional_image_link", missing, total),
+			Count:            missing,
+			Examples:         collectAIExamples(products, failing, func(_ *feed.Product) string { return "additional_image_link: (missing)" }, 10),
+			AffectedProducts: collectAIAffected(products, failing),
+			Impact:           impLvl,
+			ImpactDesc:       impDesc,
 		})
 	}
 

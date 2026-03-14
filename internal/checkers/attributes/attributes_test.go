@@ -2,6 +2,7 @@ package attributes_test
 
 import (
 	"context"
+	"fmt"
 	"os"
 	"testing"
 
@@ -105,4 +106,62 @@ func TestAttributeCheckerEmptyFeed(_ *testing.T) {
 
 	// No products → can't compute coverage → should not panic, status OK or Warning
 	_ = result
+}
+
+func TestAttributeCheckerAffectedProductsPopulated(t *testing.T) {
+	products := []feed.Product{
+		{ID: "sku-001", Title: "Product A", Description: "", Price: "10", Availability: "in stock", Link: "http://x.com", ImageLink: "http://x.com/img.jpg"},
+		{ID: "sku-002", Title: "Product B", Description: "Desc", Price: "10", Availability: "in stock", Link: "http://x.com", ImageLink: "http://x.com/img.jpg"},
+	}
+	f := &feed.Feed{Products: products, ProductCount: 2}
+	c := attributes.NewChecker()
+	result := c.Run(context.Background(), f)
+
+	var descItem *checker.Item
+	for i := range result.Items {
+		if result.Items[i].Field == "description" {
+			descItem = &result.Items[i]
+			break
+		}
+	}
+	if descItem == nil {
+		t.Fatal("expected item for field 'description'")
+	}
+	if len(descItem.AffectedProducts) != 1 {
+		t.Fatalf("AffectedProducts len = %d, want 1", len(descItem.AffectedProducts))
+	}
+	if descItem.AffectedProducts[0].ID != "sku-001" {
+		t.Errorf("AffectedProducts[0].ID = %q, want %q", descItem.AffectedProducts[0].ID, "sku-001")
+	}
+	if descItem.AffectedProducts[0].Title != "Product A" {
+		t.Errorf("AffectedProducts[0].Title = %q, want %q", descItem.AffectedProducts[0].Title, "Product A")
+	}
+}
+
+func TestAttributeCheckerAffectedProductsMatchCount(t *testing.T) {
+	// All 3 products missing 'brand' is not a required field, skip — use 'description'
+	products := make([]feed.Product, 5)
+	for i := range products {
+		products[i] = feed.Product{
+			ID: fmt.Sprintf("sku-%d", i), Title: fmt.Sprintf("Prod %d", i),
+			Price: "10", Availability: "in stock", Link: "http://x.com", ImageLink: "http://x.com/img.jpg",
+		}
+	}
+	// 3 of 5 missing description
+	products[0].Description = "Has desc"
+	products[1].Description = "Has desc"
+
+	f := &feed.Feed{Products: products, ProductCount: 5}
+	c := attributes.NewChecker()
+	result := c.Run(context.Background(), f)
+
+	for _, item := range result.Items {
+		if item.Field == "description" {
+			if item.Count != len(item.AffectedProducts) {
+				t.Errorf("Count = %d, len(AffectedProducts) = %d; they must match", item.Count, len(item.AffectedProducts))
+			}
+			return
+		}
+	}
+	t.Error("no description item found")
 }
