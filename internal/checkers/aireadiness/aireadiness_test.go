@@ -262,3 +262,57 @@ func TestAIReadinessImpactValuesAreValid(t *testing.T) {
 		}
 	}
 }
+
+func TestAIReadinessAffectedProductsPopulated(t *testing.T) {
+	// One product missing brand → AffectedProducts should have 1 entry.
+	products := []feed.Product{
+		{ID: "sku-001", Title: "Widget", Description: strings.Repeat("x", 200), Price: "10",
+			Availability: "in stock", Link: "http://x.com", ImageLink: "http://x.com/img.jpg"},
+	}
+	f := &feed.Feed{Products: products, ProductCount: 1}
+	result := aireadiness.NewChecker().Run(context.Background(), f)
+
+	for _, item := range result.Items {
+		if item.Field == "brand" {
+			if len(item.AffectedProducts) != 1 {
+				t.Fatalf("AffectedProducts len = %d, want 1", len(item.AffectedProducts))
+			}
+			if item.AffectedProducts[0].ID != "sku-001" {
+				t.Errorf("AffectedProducts[0].ID = %q, want sku-001", item.AffectedProducts[0].ID)
+			}
+			return
+		}
+	}
+	t.Error("expected item for field 'brand'")
+}
+
+func TestAIReadinessAffectedProductsNotCapped(t *testing.T) {
+	// 15 products all missing brand — AffectedProducts should have 15, Examples capped at 10.
+	const count = 15
+	products := make([]feed.Product, count)
+	for i := range products {
+		products[i] = feed.Product{
+			ID: fmt.Sprintf("sku-%03d", i), Title: fmt.Sprintf("Prod %d", i),
+			Description:  strings.Repeat("x", 200),
+			Price:        "10",
+			Availability: "in stock",
+			Link:         "http://x.com",
+			ImageLink:    "http://x.com/img.jpg",
+		}
+	}
+	f := &feed.Feed{Products: products, ProductCount: count}
+	result := aireadiness.NewChecker().Run(context.Background(), f)
+
+	for _, item := range result.Items {
+		if item.Field == "brand" {
+			if len(item.AffectedProducts) != count {
+				t.Errorf("AffectedProducts len = %d, want %d", len(item.AffectedProducts), count)
+			}
+			if len(item.Examples) > 10 {
+				t.Errorf("Examples len = %d, want <= 10", len(item.Examples))
+			}
+			return
+		}
+	}
+	t.Error("expected item for field 'brand'")
+}

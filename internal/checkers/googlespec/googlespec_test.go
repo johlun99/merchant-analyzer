@@ -604,3 +604,80 @@ func TestGoogleSpecExamplesShowBadValue(t *testing.T) {
 	}
 	t.Error("expected item for field \"condition\"")
 }
+
+func TestGoogleSpecAffectedProductsPopulated(t *testing.T) {
+	// Two products: one missing brand, one has brand.
+	raw := []byte(`<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0" xmlns:g="http://base.google.com/ns/1.0">
+  <channel>
+    <item>
+      <g:id>sku-001</g:id><g:title>No Brand</g:title>
+      <g:description>D</g:description><g:price>10 SEK</g:price>
+      <g:availability>in stock</g:availability>
+      <g:link>https://x.com</g:link><g:image_link>https://x.com/img.jpg</g:image_link>
+    </item>
+    <item>
+      <g:id>sku-002</g:id><g:title>Has Brand</g:title>
+      <g:description>D</g:description><g:price>10 SEK</g:price>
+      <g:availability>in stock</g:availability>
+      <g:link>https://x.com</g:link><g:image_link>https://x.com/img.jpg</g:image_link>
+      <g:brand>Acme</g:brand>
+    </item>
+  </channel>
+</rss>`)
+	f, err := feed.Parse(raw)
+	if err != nil {
+		t.Fatalf("parse: %v", err)
+	}
+	r := googlespec.NewChecker().Run(context.Background(), f)
+
+	for _, item := range r.Items {
+		if item.Field == "brand" {
+			if len(item.AffectedProducts) != 1 {
+				t.Fatalf("AffectedProducts len = %d, want 1", len(item.AffectedProducts))
+			}
+			if item.AffectedProducts[0].ID != "sku-001" {
+				t.Errorf("AffectedProducts[0].ID = %q, want sku-001", item.AffectedProducts[0].ID)
+			}
+			// Examples still capped at 10; AffectedProducts is the full list (no cap).
+			if len(item.Examples) > 10 {
+				t.Errorf("Examples len = %d, want <= 10", len(item.Examples))
+			}
+			return
+		}
+	}
+	t.Error("expected item for field 'brand'")
+}
+
+func TestGoogleSpecAffectedProductsNotCapped(t *testing.T) {
+	// 15 products all missing brand — AffectedProducts should have 15, Examples capped at 10.
+	const count = 15
+	items := ""
+	for i := range count {
+		items += fmt.Sprintf(`<item>
+      <g:id>sku-%03d</g:id><g:title>Prod %d</g:title>
+      <g:description>D</g:description><g:price>10 SEK</g:price>
+      <g:availability>in stock</g:availability>
+      <g:link>https://x.com</g:link><g:image_link>https://x.com/img.jpg</g:image_link>
+    </item>`, i, i)
+	}
+	raw := []byte(`<?xml version="1.0" encoding="UTF-8"?><rss version="2.0" xmlns:g="http://base.google.com/ns/1.0"><channel>` + items + `</channel></rss>`)
+	f, err := feed.Parse(raw)
+	if err != nil {
+		t.Fatalf("parse: %v", err)
+	}
+	r := googlespec.NewChecker().Run(context.Background(), f)
+
+	for _, item := range r.Items {
+		if item.Field == "brand" {
+			if len(item.AffectedProducts) != count {
+				t.Errorf("AffectedProducts len = %d, want %d", len(item.AffectedProducts), count)
+			}
+			if len(item.Examples) > 10 {
+				t.Errorf("Examples len = %d, want <= 10", len(item.Examples))
+			}
+			return
+		}
+	}
+	t.Error("expected item for field 'brand'")
+}

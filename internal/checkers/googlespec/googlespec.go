@@ -51,10 +51,11 @@ func (c *Checker) Run(_ context.Context, f *feed.Feed) checker.Result {
 		markFailures(f.Products, rule, requiredFailed, recFailed, fmtFailed)
 
 		items = append(items, checker.Item{
-			Field:    rule.field,
-			Message:  buildMessage(rule, presence, format, total),
-			Count:    presence + format,
-			Examples: collectExamples(f.Products, rule, 10),
+			Field:            rule.field,
+			Message:          buildMessage(rule, presence, format, total),
+			Count:            presence + format,
+			Examples:         collectExamples(f.Products, rule, 10),
+			AffectedProducts: collectAllAffected(f.Products, rule),
 		})
 	}
 
@@ -113,6 +114,17 @@ func scoreFromFailed(failed []bool) int {
 		}
 	}
 	return compliant * 100 / len(failed)
+}
+
+// collectAllAffected returns all products that violate rule as AffectedProduct entries (no cap).
+func collectAllAffected(products []feed.Product, rule fieldRule) []checker.AffectedProduct {
+	var affected []checker.AffectedProduct
+	for _, p := range products {
+		if isViolation(rule, &p) {
+			affected = append(affected, checker.AffectedProduct{ID: p.ID, Title: p.Title})
+		}
+	}
+	return affected
 }
 
 // collectExamples returns up to max example strings for products that violate rule.
