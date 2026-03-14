@@ -7,6 +7,7 @@ import (
 
 	"github.com/charmbracelet/bubbles/textinput"
 	"github.com/charmbracelet/bubbles/viewport"
+	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/johlun99/merchant-analyzer/internal/checker"
 	"github.com/johlun99/merchant-analyzer/internal/exporter"
@@ -27,8 +28,8 @@ const (
 
 var tabNames = [TabCount]string{"Overview", "XML", "Checks", "Google Spec", "AI Score", "Attributes"}
 
-// tabSupportsCursor returns true for tabs where items can be selected for drill-down.
-func tabSupportsCursor(tab int) bool {
+// TabSupportsCursor returns true for tabs where items can be selected for drill-down.
+func TabSupportsCursor(tab int) bool {
 	switch tab {
 	case TabXML, TabChecks, TabGoogleSpec, TabAI:
 		return true
@@ -38,11 +39,19 @@ func tabSupportsCursor(tab int) bool {
 
 // cursorDefault returns the initial cursor value for a tab (0 if it supports a cursor, -1 otherwise).
 func cursorDefault(tab int) int {
-	if tabSupportsCursor(tab) {
+	if TabSupportsCursor(tab) {
 		return 0
 	}
 	return -1
 }
+
+// reportMode controls whether the report view is showing the normal tabbed view or drill-down.
+type reportMode int
+
+const (
+	modeNormal    reportMode = iota
+	modeDrillDown            // showing ProductListView for a selected item
+)
 
 // ReportView renders the tabbed report and export overlay.
 type ReportView struct {
@@ -56,6 +65,8 @@ type ReportView struct {
 	ExportMsg    string
 	Width        int
 	Height       int
+	mode         reportMode
+	drillDown    *ProductListView
 }
 
 // NewReportView creates an initialized ReportView.
@@ -108,7 +119,7 @@ func (v *ReportView) PrevTab() {
 
 // MoveCursorUp moves the item cursor up, if the current tab supports it.
 func (v *ReportView) MoveCursorUp() {
-	if !tabSupportsCursor(v.ActiveTab) {
+	if !TabSupportsCursor(v.ActiveTab) {
 		return
 	}
 	if v.SelectedItem > 0 {
@@ -119,7 +130,7 @@ func (v *ReportView) MoveCursorUp() {
 
 // MoveCursorDown moves the item cursor down, clamped to the number of items.
 func (v *ReportView) MoveCursorDown() {
-	if !tabSupportsCursor(v.ActiveTab) {
+	if !TabSupportsCursor(v.ActiveTab) {
 		return
 	}
 	items := v.currentItems()
@@ -131,7 +142,7 @@ func (v *ReportView) MoveCursorDown() {
 
 // CurrentSelectedItem returns a pointer to the currently selected item, or nil.
 func (v *ReportView) CurrentSelectedItem() *checker.Item {
-	if !tabSupportsCursor(v.ActiveTab) {
+	if !TabSupportsCursor(v.ActiveTab) {
 		return nil
 	}
 	items := v.currentItems()
@@ -181,6 +192,38 @@ func (v *ReportView) OpenExport() {
 	v.ExportMsg = ""
 }
 
+// InDrillDown reports whether the drill-down product list is active.
+func (v *ReportView) InDrillDown() bool {
+	return v.mode == modeDrillDown
+}
+
+// OpenDrillDown opens the product list drill-down for the currently selected item.
+// Returns false if there is no selectable item with products.
+func (v *ReportView) OpenDrillDown() bool {
+	item := v.CurrentSelectedItem()
+	if item == nil || len(item.AffectedProducts) == 0 {
+		return false
+	}
+	checkerName := checkerNameForTab(v.ActiveTab)
+	v.drillDown = NewProductListView(checkerName, item.Field, item.AffectedProducts, v.Width, v.Height)
+	v.mode = modeDrillDown
+	return true
+}
+
+// UpdateDrillDownMsg passes a tea.Msg to the drill-down view.
+func (v *ReportView) UpdateDrillDownMsg(msg tea.Msg) (tea.Cmd, bool) {
+	if v.drillDown == nil {
+		return nil, true
+	}
+	updated, cmd, done := v.drillDown.Update(msg)
+	v.drillDown = updated
+	if done {
+		v.mode = modeNormal
+		v.drillDown = nil
+	}
+	return cmd, done
+}
+
 // CloseExport closes the export overlay.
 func (v *ReportView) CloseExport() {
 	v.ExportOpen = false
@@ -190,6 +233,9 @@ func (v *ReportView) CloseExport() {
 
 // View renders the full report view including any overlay.
 func (v ReportView) View() string {
+	if v.mode == modeDrillDown && v.drillDown != nil {
+		return v.drillDown.View()
+	}
 	base := v.renderBase()
 	if v.ExportOpen {
 		return v.renderWithOverlay(base)
@@ -217,7 +263,7 @@ func (v ReportView) renderBase() string {
 
 	// Help bar
 	helpText := "  tab next  shift+tab prev  e export  q quit"
-	if tabSupportsCursor(v.ActiveTab) {
+	if TabSupportsCursor(v.ActiveTab) {
 		helpText = "  tab next  shift+tab prev  ↑/↓ select  enter drill-down  e export  q quit"
 	}
 	fmt.Fprintf(&b, "\n%s", styles.StyleHelp.Render(helpText))
@@ -326,7 +372,7 @@ func (v ReportView) renderCheckerTab(name string) string {
 		}
 		for i, item := range r.Items {
 			cursor := "  "
-			if tabSupportsCursor(v.ActiveTab) && i == v.SelectedItem {
+			if TabSupportsCursor(v.ActiveTab) && i == v.SelectedItem {
 				cursor = styles.StyleMetric.Render("▶ ")
 			}
 			bullet := styles.StyleMetricLabel.Render("•")
