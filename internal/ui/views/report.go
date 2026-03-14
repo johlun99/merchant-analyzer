@@ -27,17 +27,35 @@ const (
 
 var tabNames = [TabCount]string{"Overview", "XML", "Checks", "Google Spec", "AI Score", "Attributes"}
 
+// tabSupportsCursor returns true for tabs where items can be selected for drill-down.
+func tabSupportsCursor(tab int) bool {
+	switch tab {
+	case TabXML, TabChecks, TabGoogleSpec, TabAI:
+		return true
+	}
+	return false
+}
+
+// cursorDefault returns the initial cursor value for a tab (0 if it supports a cursor, -1 otherwise).
+func cursorDefault(tab int) int {
+	if tabSupportsCursor(tab) {
+		return 0
+	}
+	return -1
+}
+
 // ReportView renders the tabbed report and export overlay.
 type ReportView struct {
-	Feed        *feed.Feed
-	Results     []checker.Result
-	ActiveTab   int
-	Viewport    viewport.Model
-	ExportOpen  bool
-	ExportInput textinput.Model
-	ExportMsg   string
-	Width       int
-	Height      int
+	Feed         *feed.Feed
+	Results      []checker.Result
+	ActiveTab    int
+	SelectedItem int // cursor index into current tab's items; -1 on non-cursor tabs
+	Viewport     viewport.Model
+	ExportOpen   bool
+	ExportInput  textinput.Model
+	ExportMsg    string
+	Width        int
+	Height       int
 }
 
 // NewReportView creates an initialized ReportView.
@@ -51,12 +69,13 @@ func NewReportView(f *feed.Feed, results []checker.Result, width, height int) Re
 	ti.Width = 40
 
 	rv := ReportView{
-		Feed:        f,
-		Results:     results,
-		Viewport:    vp,
-		ExportInput: ti,
-		Width:       width,
-		Height:      height,
+		Feed:         f,
+		Results:      results,
+		Viewport:     vp,
+		ExportInput:  ti,
+		Width:        width,
+		Height:       height,
+		SelectedItem: cursorDefault(TabOverview),
 	}
 	rv.refreshViewport()
 	return rv
@@ -74,6 +93,7 @@ func (v *ReportView) SetSize(w, h int) {
 // NextTab advances to the next tab.
 func (v *ReportView) NextTab() {
 	v.ActiveTab = (v.ActiveTab + 1) % TabCount
+	v.SelectedItem = cursorDefault(v.ActiveTab)
 	v.Viewport.GotoTop()
 	v.refreshViewport()
 }
@@ -81,8 +101,77 @@ func (v *ReportView) NextTab() {
 // PrevTab goes to the previous tab.
 func (v *ReportView) PrevTab() {
 	v.ActiveTab = (v.ActiveTab - 1 + TabCount) % TabCount
+	v.SelectedItem = cursorDefault(v.ActiveTab)
 	v.Viewport.GotoTop()
 	v.refreshViewport()
+}
+
+// MoveCursorUp moves the item cursor up, if the current tab supports it.
+func (v *ReportView) MoveCursorUp() {
+	if !tabSupportsCursor(v.ActiveTab) {
+		return
+	}
+	if v.SelectedItem > 0 {
+		v.SelectedItem--
+		v.refreshViewport()
+	}
+}
+
+// MoveCursorDown moves the item cursor down, clamped to the number of items.
+func (v *ReportView) MoveCursorDown() {
+	if !tabSupportsCursor(v.ActiveTab) {
+		return
+	}
+	items := v.currentItems()
+	if v.SelectedItem < len(items)-1 {
+		v.SelectedItem++
+		v.refreshViewport()
+	}
+}
+
+// CurrentSelectedItem returns a pointer to the currently selected item, or nil.
+func (v *ReportView) CurrentSelectedItem() *checker.Item {
+	if !tabSupportsCursor(v.ActiveTab) {
+		return nil
+	}
+	items := v.currentItems()
+	if len(items) == 0 || v.SelectedItem < 0 || v.SelectedItem >= len(items) {
+		return nil
+	}
+	item := items[v.SelectedItem]
+	return &item
+}
+
+// currentItems returns the checker.Items for the active tab.
+func (v *ReportView) currentItems() []checker.Item {
+	name := checkerNameForTab(v.ActiveTab)
+	if name == "" {
+		return nil
+	}
+	for _, r := range v.Results {
+		if r.Name == name {
+			if v.ActiveTab == TabAI {
+				return sortedByImpact(r.Items)
+			}
+			return r.Items
+		}
+	}
+	return nil
+}
+
+// checkerNameForTab maps a tab index to its checker result name.
+func checkerNameForTab(tab int) string {
+	switch tab {
+	case TabXML:
+		return "XML Validation"
+	case TabChecks:
+		return "Attribute Check"
+	case TabGoogleSpec:
+		return "Google Feed Spec"
+	case TabAI:
+		return "AI Readiness"
+	}
+	return ""
 }
 
 // OpenExport opens the export overlay.
@@ -127,7 +216,11 @@ func (v ReportView) renderBase() string {
 	fmt.Fprint(&b, v.Viewport.View())
 
 	// Help bar
-	fmt.Fprintf(&b, "\n%s", styles.StyleHelp.Render("  tab next  shift+tab prev  e export  q quit"))
+	helpText := "  tab next  shift+tab prev  e export  q quit"
+	if tabSupportsCursor(v.ActiveTab) {
+		helpText = "  tab next  shift+tab prev  ↑/↓ select  enter drill-down  e export  q quit"
+	}
+	fmt.Fprintf(&b, "\n%s", styles.StyleHelp.Render(helpText))
 
 	// Export success banner
 	if v.ExportMsg != "" {
@@ -231,10 +324,14 @@ func (v ReportView) renderCheckerTab(name string) string {
 			fmt.Fprintf(&b, "  %s\n", styles.StyleCheckOK.Render("No issues found."))
 			return b.String()
 		}
-		for _, item := range r.Items {
-			bullet := styles.StyleMetricLabel.Render("  •")
+		for i, item := range r.Items {
+			cursor := "  "
+			if tabSupportsCursor(v.ActiveTab) && i == v.SelectedItem {
+				cursor = styles.StyleMetric.Render("▶ ")
+			}
+			bullet := styles.StyleMetricLabel.Render("•")
 			field := lipgloss.NewStyle().Bold(true).Render(item.Field)
-			fmt.Fprintf(&b, "%s %s: %s\n", bullet, field, item.Message)
+			fmt.Fprintf(&b, "%s%s %s: %s\n", cursor, bullet, field, item.Message)
 			for _, ex := range item.Examples {
 				fmt.Fprintf(&b, "    %s\n", styles.StyleMetricLabel.Render(ex))
 			}
@@ -290,10 +387,14 @@ func (v ReportView) renderAITab() string {
 		}
 		fmt.Fprintf(&b, "  Improvements:\n\n")
 		items := sortedByImpact(r.Items)
-		for _, item := range items {
-			bullet := styles.StyleMetricLabel.Render("  •")
+		for i, item := range items {
+			cursor := "  "
+			if i == v.SelectedItem {
+				cursor = styles.StyleMetric.Render("▶ ")
+			}
+			bullet := styles.StyleMetricLabel.Render("•")
 			field := lipgloss.NewStyle().Bold(true).Render(item.Field)
-			fmt.Fprintf(&b, "%s %s: %s\n", bullet, field, item.Message)
+			fmt.Fprintf(&b, "%s%s %s: %s\n", cursor, bullet, field, item.Message)
 			if item.Impact != "" {
 				badge := renderImpactBadge(item.Impact)
 				fmt.Fprintf(&b, "    %s  %s\n", badge, styles.StyleMetricLabel.Render(item.ImpactDesc))
