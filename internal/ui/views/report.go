@@ -349,26 +349,18 @@ func (v ReportView) renderBase() string {
 
 func (v ReportView) renderWithOverlay(base string) string {
 	overlay := v.renderExportOverlay()
-	// Place overlay centered horizontally, ~1/3 from top
-	lines := strings.Split(base, "\n")
-	overlayLines := strings.Split(overlay, "\n")
 	overlayWidth := lipgloss.Width(overlay)
 	startX := (v.Width - overlayWidth) / 2
 	if startX < 0 {
 		startX = 0
 	}
+	lines := strings.Split(base, "\n")
+	overlayLines := strings.Split(overlay, "\n")
 	startY := len(lines) / 3
 	if startY+len(overlayLines) > len(lines) {
 		startY = 0
 	}
-	for i, ol := range overlayLines {
-		y := startY + i
-		if y < len(lines) {
-			pad := strings.Repeat(" ", startX)
-			lines[y] = pad + ol
-		}
-	}
-	return strings.Join(lines, "\n")
+	return placeOverlay(startX, startY, overlay, base)
 }
 
 func (v ReportView) renderExportOverlay() string {
