@@ -276,7 +276,7 @@ func (v *ReportView) OpenDrillDown() bool {
 		return false
 	}
 	checkerName := checkerNameForTab(v.ActiveTab)
-	v.drillDown = NewProductListView(checkerName, item.Field, item.AffectedProducts, v.Width, v.Height)
+	v.drillDown = NewProductListView(checkerName, item.Field, item.Message, item.AffectedProducts, v.Width, v.Height)
 	v.mode = modeDrillDown
 	return true
 }
@@ -293,6 +293,29 @@ func (v *ReportView) UpdateDrillDownMsg(msg tea.Msg) (tea.Cmd, bool) {
 		v.drillDown = nil
 	}
 	return cmd, done
+}
+
+// CloseDrillDown exits the drill-down view and returns to normal mode.
+func (v *ReportView) CloseDrillDown() {
+	v.mode = modeNormal
+	v.drillDown = nil
+}
+
+// DrillDownWantsExport returns true (and resets the flag) when the drill-down view requested an export.
+func (v *ReportView) DrillDownWantsExport() bool {
+	if v.drillDown == nil || !v.drillDown.ExportRequested {
+		return false
+	}
+	v.drillDown.ExportRequested = false
+	return true
+}
+
+// DrillDownExportData returns the context, chosen filename, and filtered products from the active drill-down.
+func (v *ReportView) DrillDownExportData() (checkerName, field, message, filename string, products []checker.AffectedProduct) {
+	if v.drillDown == nil {
+		return "", "", "", "", nil
+	}
+	return v.drillDown.CheckerName, v.drillDown.Field, v.drillDown.Message, v.drillDown.ExportFilename, v.drillDown.Filtered
 }
 
 // CloseExport closes the export overlay.

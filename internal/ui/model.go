@@ -182,7 +182,39 @@ func (m *Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 
 func (m *Model) handleDrillDownKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	cmd, _ := m.report.UpdateDrillDownMsg(msg)
+	if m.report.DrillDownWantsExport() {
+		exportCmd := m.doDrillDownExport()
+		m.report.CloseDrillDown()
+		return m, exportCmd
+	}
 	return m, cmd
+}
+
+func (m *Model) doDrillDownExport() tea.Cmd {
+	_, _, _, filename, products := m.report.DrillDownExportData()
+	if filename == "" {
+		filename = "products.csv"
+	}
+	return func() tea.Msg {
+		var buf strings.Builder
+		buf.WriteString("product_id,product_title,value\n")
+		for _, p := range products {
+			row := []string{p.ID, p.Title, p.Value}
+			// Simple CSV encoding: quote fields containing comma, quote, or newline.
+			encoded := make([]string, len(row))
+			for i, f := range row {
+				if strings.ContainsAny(f, ",\"\n") {
+					f = `"` + strings.ReplaceAll(f, `"`, `""`) + `"`
+				}
+				encoded[i] = f
+			}
+			buf.WriteString(strings.Join(encoded, ",") + "\n")
+		}
+		if err := os.WriteFile(filename, []byte(buf.String()), 0o600); err != nil {
+			return exportErrMsg{err: err}
+		}
+		return exportDoneMsg{path: filename}
+	}
 }
 
 func (m *Model) handleReportKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {

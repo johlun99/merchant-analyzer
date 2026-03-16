@@ -117,11 +117,17 @@ func scoreFromFailed(failed []bool) int {
 }
 
 // collectAllAffected returns all products that violate rule as AffectedProduct entries (no cap).
+// Value is set to the field value or "(missing)" to carry per-product context for drill-down and export.
 func collectAllAffected(products []feed.Product, rule fieldRule) []checker.AffectedProduct {
 	var affected []checker.AffectedProduct
 	for _, p := range products {
 		if isViolation(rule, &p) {
-			affected = append(affected, checker.AffectedProduct{ID: p.ID, Title: p.Title})
+			v := rule.get(&p)
+			val := v
+			if val == "" {
+				val = "(missing)"
+			}
+			affected = append(affected, checker.AffectedProduct{ID: p.ID, Title: p.Title, Value: rule.field + ": " + val})
 		}
 	}
 	return affected
