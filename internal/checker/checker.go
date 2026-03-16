@@ -24,10 +24,11 @@ type SubScore struct {
 	Score int
 }
 
-// AffectedProduct holds the ID and Title of a product that triggered a checker finding.
+// AffectedProduct holds the ID, Title, and optional per-product context for a checker finding.
 type AffectedProduct struct {
 	ID    string
 	Title string
+	Value string // optional: per-product context, e.g. "color: (missing)" or "description: 45 chars"
 }
 
 // Item is a single finding from a checker.

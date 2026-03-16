@@ -11,6 +11,8 @@ type ProductIssue struct {
 	Checker          string                    `json:"checker"`
 	Field            string                    `json:"field"`
 	Message          string                    `json:"message"`
+	Impact           string                    `json:"impact,omitempty"`
+	ImpactDesc       string                    `json:"impact_desc,omitempty"`
 	AffectedProducts []checker.AffectedProduct `json:"affected_products"`
 }
 
@@ -27,6 +29,8 @@ func ToProductJSON(report Report) ([]byte, error) {
 				Checker:          result.Name,
 				Field:            item.Field,
 				Message:          item.Message,
+				Impact:           item.Impact,
+				ImpactDesc:       item.ImpactDesc,
 				AffectedProducts: item.AffectedProducts,
 			})
 		}

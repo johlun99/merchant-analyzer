@@ -119,12 +119,13 @@ func collectAIExamples(products []feed.Product, failing func(*feed.Product) bool
 }
 
 // collectAIAffected returns all products where failing returns true as AffectedProduct entries (no cap).
-func collectAIAffected(products []feed.Product, failing func(*feed.Product) bool) []checker.AffectedProduct {
+// label(p) produces the per-product context string stored in Value (e.g. "color: (missing)").
+func collectAIAffected(products []feed.Product, failing func(*feed.Product) bool, label func(*feed.Product) string) []checker.AffectedProduct {
 	var affected []checker.AffectedProduct
 	for i := range products {
 		p := &products[i]
 		if failing(p) {
-			affected = append(affected, checker.AffectedProduct{ID: p.ID, Title: p.Title})
+			affected = append(affected, checker.AffectedProduct{ID: p.ID, Title: p.Title, Value: label(p)})
 		}
 	}
 	return affected
@@ -171,12 +172,13 @@ func computeUCPScore(products []feed.Product) (float64, []checker.Item) {
 			fieldName := f.name
 			failing := func(p *feed.Product) bool { return f.get(p) == "" }
 			impLvl, impDesc := impactFor(fieldName)
+			ucpLabel := func(_ *feed.Product) string { return fieldName + ": (missing)" }
 			items = append(items, checker.Item{
 				Field:            fieldName,
 				Message:          fmt.Sprintf("UCP: %d of %d products missing %q", missing, total, fieldName),
 				Count:            missing,
-				Examples:         collectAIExamples(products, failing, func(_ *feed.Product) string { return fieldName + ": (missing)" }, 10),
-				AffectedProducts: collectAIAffected(products, failing),
+				Examples:         collectAIExamples(products, failing, ucpLabel, 10),
+				AffectedProducts: collectAIAffected(products, failing, ucpLabel),
 				Impact:           impLvl,
 				ImpactDesc:       impDesc,
 			})
@@ -234,7 +236,7 @@ func computeLLMScore(products []feed.Product) (float64, []checker.Item) {
 				Message:          fmt.Sprintf("LLM: %d of %d products missing %q", missing, total, ch.name),
 				Count:            missing,
 				Examples:         collectAIExamples(products, failing, ch.label, 10),
-				AffectedProducts: collectAIAffected(products, failing),
+				AffectedProducts: collectAIAffected(products, failing, ch.label),
 				Impact:           impLvl,
 				ImpactDesc:       impDesc,
 			})
@@ -268,13 +270,14 @@ func computeImageScore(products []feed.Product) (float64, []checker.Item) {
 	if imageCoverage < 1.0 {
 		missing := total - withImage
 		failing := func(p *feed.Product) bool { return p.ImageLink == "" }
+		imgLabel := func(_ *feed.Product) string { return "image_link: (missing)" }
 		impLvl, impDesc := impactFor("image_link")
 		items = append(items, checker.Item{
 			Field:            "image_link",
 			Message:          fmt.Sprintf("Image: %d of %d products missing image_link", missing, total),
 			Count:            missing,
-			Examples:         collectAIExamples(products, failing, func(_ *feed.Product) string { return "image_link: (missing)" }, 10),
-			AffectedProducts: collectAIAffected(products, failing),
+			Examples:         collectAIExamples(products, failing, imgLabel, 10),
+			AffectedProducts: collectAIAffected(products, failing, imgLabel),
 			Impact:           impLvl,
 			ImpactDesc:       impDesc,
 		})
@@ -282,13 +285,14 @@ func computeImageScore(products []feed.Product) (float64, []checker.Item) {
 	if additionalCoverage < 1.0 {
 		missing := total - withAdditional
 		failing := func(p *feed.Product) bool { return len(p.AdditionalImages) == 0 }
+		addImgLabel := func(_ *feed.Product) string { return "additional_image_link: (missing)" }
 		impLvl, impDesc := impactFor("additional_image_link")
 		items = append(items, checker.Item{
 			Field:            "additional_image_link",
 			Message:          fmt.Sprintf("Image: %d of %d products missing additional_image_link", missing, total),
 			Count:            missing,
-			Examples:         collectAIExamples(products, failing, func(_ *feed.Product) string { return "additional_image_link: (missing)" }, 10),
-			AffectedProducts: collectAIAffected(products, failing),
+			Examples:         collectAIExamples(products, failing, addImgLabel, 10),
+			AffectedProducts: collectAIAffected(products, failing, addImgLabel),
 			Impact:           impLvl,
 			ImpactDesc:       impDesc,
 		})

@@ -53,11 +53,17 @@ const (
 	modeDrillDown            // showing ProductListView for a selected item
 )
 
+type exportSection struct {
+	name    string
+	enabled bool
+}
+
 // ExportSelections holds the format toggles chosen in the export overlay.
 type ExportSelections struct {
-	MainReport   bool
-	ProductsCSV  bool
-	ProductsJSON bool
+	MainReport       bool
+	ProductsCSV      bool
+	ProductsJSON     bool
+	IncludedSections map[string]bool // section name → include; nil = all included
 }
 
 // ReportView renders the tabbed report and export overlay.
@@ -78,8 +84,9 @@ type ReportView struct {
 	exportMain      bool // default true
 	exportCSV       bool // default true
 	exportJSON      bool // default false
-	exportFocusRow  int  // 0=filename, 1=main, 2=csv, 3=json
+	exportFocusRow  int  // 0=filename, 1=main, 2=csv, 3=json, 4+=sections
 	exportToggleErr string
+	exportSections  []exportSection // populated by OpenExport
 }
 
 // NewReportView creates an initialized ReportView.
@@ -210,27 +217,44 @@ func (v *ReportView) OpenExport() {
 	v.exportJSON = false
 	v.exportFocusRow = 0
 	v.exportToggleErr = ""
+	resultByName := make(map[string]bool, len(v.Results))
+	for _, r := range v.Results {
+		resultByName[r.Name] = true
+	}
+	v.exportSections = make([]exportSection, 0, len(v.Results)+1)
+	for tab := range TabCount {
+		name := checkerNameForTab(tab)
+		if name != "" && resultByName[name] {
+			v.exportSections = append(v.exportSections, exportSection{name, true})
+		}
+	}
+	v.exportSections = append(v.exportSections, exportSection{"Attributes", true})
 }
 
 // ExportSelections returns the current toggle state of the export overlay.
 func (v *ReportView) ExportSelections() ExportSelections {
+	included := make(map[string]bool, len(v.exportSections))
+	for _, s := range v.exportSections {
+		included[s.name] = s.enabled
+	}
 	return ExportSelections{
-		MainReport:   v.exportMain,
-		ProductsCSV:  v.exportCSV,
-		ProductsJSON: v.exportJSON,
+		MainReport:       v.exportMain,
+		ProductsCSV:      v.exportCSV,
+		ProductsJSON:     v.exportJSON,
+		IncludedSections: included,
 	}
 }
 
 // HandleExportToggleKey processes navigation and toggle keys inside the export overlay.
 // Returns true when the caller should confirm the export (Enter with valid selection).
 func (v *ReportView) HandleExportToggleKey(key string) bool {
-	const rows = 4 // 0=filename, 1=main, 2=csv, 3=json
+	totalRows := 4 + len(v.exportSections) // 0=filename, 1=main, 2=csv, 3=json, 4+=sections
 	switch key {
 	case "tab", "down":
 		if v.exportFocusRow == 0 {
 			v.ExportInput.Blur()
 		}
-		v.exportFocusRow = (v.exportFocusRow + 1) % rows
+		v.exportFocusRow = (v.exportFocusRow + 1) % totalRows
 		if v.exportFocusRow == 0 {
 			v.ExportInput.Focus()
 		}
@@ -238,7 +262,7 @@ func (v *ReportView) HandleExportToggleKey(key string) bool {
 		if v.exportFocusRow == 0 {
 			v.ExportInput.Blur()
 		}
-		v.exportFocusRow = (v.exportFocusRow - 1 + rows) % rows
+		v.exportFocusRow = (v.exportFocusRow - 1 + totalRows) % totalRows
 		if v.exportFocusRow == 0 {
 			v.ExportInput.Focus()
 		}
@@ -250,17 +274,37 @@ func (v *ReportView) HandleExportToggleKey(key string) bool {
 			v.exportCSV = !v.exportCSV
 		case 3:
 			v.exportJSON = !v.exportJSON
+		default:
+			idx := v.exportFocusRow - 4
+			if idx >= 0 && idx < len(v.exportSections) {
+				v.exportSections[idx].enabled = !v.exportSections[idx].enabled
+			}
 		}
 		v.exportToggleErr = ""
 	case "enter":
-		if !v.exportMain && !v.exportCSV && !v.exportJSON {
-			v.exportToggleErr = "Select at least one export format"
+		if err := v.validateExportSelections(); err != "" {
+			v.exportToggleErr = err
 			return false
 		}
 		v.exportToggleErr = ""
 		return true
 	}
 	return false
+}
+
+func (v *ReportView) validateExportSelections() string {
+	if !v.exportMain && !v.exportCSV && !v.exportJSON {
+		return "Select at least one export format"
+	}
+	if v.exportMain {
+		for _, s := range v.exportSections {
+			if s.enabled {
+				return ""
+			}
+		}
+		return "Select at least one section for main report"
+	}
+	return ""
 }
 
 // InDrillDown reports whether the drill-down product list is active.
@@ -276,7 +320,7 @@ func (v *ReportView) OpenDrillDown() bool {
 		return false
 	}
 	checkerName := checkerNameForTab(v.ActiveTab)
-	v.drillDown = NewProductListView(checkerName, item.Field, item.AffectedProducts, v.Width, v.Height)
+	v.drillDown = NewProductListView(checkerName, item.Field, item.Message, item.AffectedProducts, v.Width, v.Height)
 	v.mode = modeDrillDown
 	return true
 }
@@ -293,6 +337,29 @@ func (v *ReportView) UpdateDrillDownMsg(msg tea.Msg) (tea.Cmd, bool) {
 		v.drillDown = nil
 	}
 	return cmd, done
+}
+
+// CloseDrillDown exits the drill-down view and returns to normal mode.
+func (v *ReportView) CloseDrillDown() {
+	v.mode = modeNormal
+	v.drillDown = nil
+}
+
+// DrillDownWantsExport returns true (and resets the flag) when the drill-down view requested an export.
+func (v *ReportView) DrillDownWantsExport() bool {
+	if v.drillDown == nil || !v.drillDown.ExportRequested {
+		return false
+	}
+	v.drillDown.ExportRequested = false
+	return true
+}
+
+// DrillDownExportData returns the context, chosen filename, and filtered products from the active drill-down.
+func (v *ReportView) DrillDownExportData() (checkerName, field, message, filename string, products []checker.AffectedProduct) {
+	if v.drillDown == nil {
+		return "", "", "", "", nil
+	}
+	return v.drillDown.CheckerName, v.drillDown.Field, v.drillDown.Message, v.drillDown.ExportFilename, v.drillDown.Filtered
 }
 
 // CloseExport closes the export overlay.
@@ -388,6 +455,21 @@ func (v ReportView) renderExportOverlay() string {
 			box = styles.StyleStatusOK.Render("[x]")
 		}
 		fmt.Fprintf(&b, "%s%s %s\n", cursor, box, row.label)
+	}
+
+	// Sections block
+	fmt.Fprintf(&b, "\n  %s\n", styles.StyleMetricLabel.Render("Sections"))
+	for i, sec := range v.exportSections {
+		rowIdx := 4 + i
+		cursor := "  "
+		if v.exportFocusRow == rowIdx {
+			cursor = styles.StyleMetric.Render("> ")
+		}
+		box := "[ ]"
+		if sec.enabled {
+			box = styles.StyleStatusOK.Render("[x]")
+		}
+		fmt.Fprintf(&b, "%s%s %s\n", cursor, box, sec.name)
 	}
 
 	if v.exportToggleErr != "" {

@@ -12,11 +12,11 @@ import (
 func ToProductCSV(report Report) ([]byte, error) {
 	var buf bytes.Buffer
 	w := csv.NewWriter(&buf)
-	_ = w.Write([]string{"checker", "field", "message", "product_id", "product_title"})
+	_ = w.Write([]string{"checker", "field", "message", "product_id", "product_title", "impact", "reason", "value"})
 	for _, result := range report.Results {
 		for _, item := range result.Items {
 			for _, p := range item.AffectedProducts {
-				_ = w.Write([]string{result.Name, item.Field, item.Message, p.ID, p.Title})
+				_ = w.Write([]string{result.Name, item.Field, item.Message, p.ID, p.Title, item.Impact, item.ImpactDesc, p.Value})
 			}
 		}
 	}
