@@ -1,0 +1,118 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    strategy:
+      matrix:
+        include:
+          - os: ubuntu-latest
+            goos: linux
+            goarch: amd64
+          - os: ubuntu-latest
+            goos: linux
+            goarch: arm64
+          - os: macos-latest
+            goos: darwin
+            goarch: amd64
+          - os: macos-latest
+            goos: darwin
+            goarch: arm64
+          - os: windows-latest
+            goos: windows
+            goarch: amd64
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+
+      - name: Build
+        env:
+          GOOS: ${{ matrix.goos }}
+          GOARCH: ${{ matrix.goarch }}
+        run: |
+          go build \
+            -ldflags="-X main.version=${{ github.ref_name }}" \
+            -o merchant-analyzer-${{ matrix.goos }}-${{ matrix.goarch }}${{ matrix.goos == 'windows' && '.exe' || '' }} \
+            ./cmd/merchant-analyzer
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: merchant-analyzer-${{ matrix.goos }}-${{ matrix.goarch }}
+          path: merchant-analyzer-${{ matrix.goos }}-${{ matrix.goarch }}${{ matrix.goos == 'windows' && '.exe' || '' }}
+          retention-days: 1
+
+  release:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/download-artifact@v4
+        with:
+          merge-multiple: true
+
+      - name: Generate release notes
+        id: notes
+        run: |
+          CURRENT="${{ github.ref_name }}"
+          PREV=$(git tag --sort=-version:refname | grep -v "^${CURRENT}$" | head -1)
+
+          if [ -n "$PREV" ]; then
+            RANGE="${PREV}..${CURRENT}"
+          else
+            RANGE="${CURRENT}"
+          fi
+
+          repo="https://github.com/${{ github.repository }}"
+
+          # Emit one markdown section for commits matching a conventional type.
+          # Usage: section "emoji Title" "type1|type2"
+          section() {
+            local title="$1"
+            local types="$2"
+            local pattern="^(${types})(\([^)]+\))?:"
+            local out=""
+
+            while IFS='|' read -r hash subject; do
+              if echo "$subject" | grep -qE "$pattern"; then
+                out="${out}- [\`${hash}\`](${repo}/commit/${hash}) ${subject}\n"
+              fi
+            done < <(git log --pretty=format:"%h|%s" "$RANGE")
+
+            if [ -n "$out" ]; then
+              printf "### %s\n\n%b\n" "$title" "$out"
+            fi
+          }
+
+          {
+            echo "NOTES<<EOF"
+            section "✨ New Features"   "feat|feature"
+            section "🐛 Bug Fixes"      "fix"
+            section "📚 Documentation"  "docs"
+            section "♻️ Refactoring"    "refactor"
+            section "🧪 Tests"          "test"
+            section "🔧 Maintenance"    "chore|ci|build|perf"
+            if [ -n "$PREV" ]; then
+              echo "**Full changelog:** [\`${PREV}...${CURRENT}\`](${repo}/compare/${PREV}...${CURRENT})"
+            fi
+            echo "EOF"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Create GitHub release
+        uses: softprops/action-gh-release@v2
+        with:
+          body: ${{ steps.notes.outputs.NOTES }}
+          files: merchant-analyzer-*
