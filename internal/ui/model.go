@@ -286,6 +286,18 @@ func (m *Model) doExport(filename string, sel views.ExportSelections) tea.Cmd {
 		filename = "report.json"
 	}
 	report := views.BuildReport(m.feed, m.results)
+	if sel.IncludedSections != nil {
+		var filtered []checker.Result
+		for _, r := range report.Results {
+			if sel.IncludedSections[r.Name] {
+				filtered = append(filtered, r)
+			}
+		}
+		report.Results = filtered
+		if !sel.IncludedSections["Attributes"] {
+			report.Attributes = nil
+		}
+	}
 	return func() tea.Msg {
 		var written []string
 		if sel.MainReport {
